@@ -2,8 +2,8 @@
 
 Contenu servi par [Gophernicus](https://github.com/gophernicus/gophernicus)
 (docker sur le VPS) : un mix du portfolio
-([`../portfolio`](../portfolio)) et de la doc perso
-([`../Fracorbas-Docs`](../Fracorbas-Docs)), version old-school.
+([`portfolio`](https://github.com/Fracorbas02/portfolio)) et de la doc perso
+([`Documentation`](https://github.com/Fracorbas02/Fracorbas-Docs)), version old-school.
 
 ## Arborescence
 
@@ -29,10 +29,9 @@ Après toute modification du portfolio ou de la doc :
 ```sh
 python3 tools/build.py
 ```
+> Merci mistral pour l'aide sur le script
 
-Puis commit + push : le workflow GitHub rsync tout (sauf `tools/`,
-`.github/`, `README.md`) vers le VPS, où le conteneur Gophernicus sert
-le dossier en direct.
+Utilisation de la même CI que ma documentation & portfolio
 
 ## Rappels Gophernicus
 
