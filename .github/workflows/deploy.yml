@@ -1,0 +1,48 @@
+name: Deploy portfolio to VPS OVH
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Moindre privilège : ce workflow n'a besoin d'aucune écriture côté
+# GitHub, uniquement de lire le dépôt et les secrets. Le GITHUB_TOKEN
+# du runner est ainsi inutilisable pour modifier le dépôt.
+permissions:
+  contents: read
+
+# Un seul déploiement à la fois : les pushs successifs s'annulent
+# mutuellement plutôt que de déployer en parallèle
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+    steps:
+      # actions/checkout v4.2.2 épinglé par SHA (supply-chain)
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          install -m 600 /dev/stdin ~/.ssh/id_ed25519 <<< "${{ secrets.SSH_PRIVATE_KEY }}"
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Deploy via rsync
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.gitignore' \
+            --exclude '.well-known' \
+            --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            . \
+            "${SSH_USER}@${SSH_HOST}:"
