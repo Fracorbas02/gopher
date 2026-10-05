@@ -1,4 +1,4 @@
-name: Deploy portfolio to VPS OVH
+name: Deploy gopher to VPS OVH
 
 on:
   push:
