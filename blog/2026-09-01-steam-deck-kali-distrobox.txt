@@ -1,0 +1,386 @@
+========================================================================
+Installer Kali Linux sur Steam Deck sans tout casser — ou l'art de se battre avec Distrobox
+========================================================================
+
+Le 2026-09-01 / Tags : Linux, cybersecurite, lab, gaming
+
+
+Voilà maintenant que j'ai une Steam Deck entre les mains, je me suis dit
+que ce serait dommage de ne pas en profiter pour avoir un environnement
+de pentest mobile. Après tout, c'est une machine Arch Linux sous le
+capot, ça devrait être facile, non ?
+
+Spoiler : non, ça ne l'a pas été.
+
+
+
+Avant de commencer, une petite mise en bouche ne fait pas de mal :
+Distrobox - Issue #995
+(https://github.com/89luca89/distrobox/issues/995). Oui, ce bug est
+connu depuis un moment et n'est toujours résolu proprement à ce jour...
+
+Malgré ça, j'ai tout de même pu installer mon environnement Kali, après
+beaucoup, beaucoup de mal.
+
+
+Pourquoi SteamOS est Immutable (et pourquoi c'est une bonne chose)
+------------------------------------------------------------------
+
+Quand on dit que la Steam Deck tourne sous Arch Linux, c'est
+techniquement vrai, mais c'est comme dire qu'une Formule 1 tourne avec
+de l'essence : techniquement correct, mais ça décrit pas vraiment ce qui
+se passe. SteamOS 3 est une mutation d'Arch qui prend le chemin inverse
+d'une distribution classique : au lieu de laisser l'utilisateur modifier
+tout, tout le temps, elle verrouille la racine du système en lecture
+seule.
+
+
+- Le schéma A/B et le filesystem read-only
+
+Le rootfs (/) est une partition BTRFS montée en read-only. Mais le
+véritable mécanisme qui rend SteamOS robuste, c'est son schéma de
+partitions A/B : deux partitions racine côte à côte, disons nvme0n1p4
+(active) et nvme0n1p5 (inactive).
+
+À chaque mise à jour, SteamOS écrit la nouvelle image sur la partition
+inactive, puis bascule dessus au prochain reboot. C'est un update
+atomique : soit ça marche et tu démarres sur la nouvelle version, soit
+ça casse et tu rebootes sur l'ancienne. Pas de système à mi-chemin entre
+deux versions, pas de paquet cassé à mi-chemin d'un pacman -Syu.
+
+
+    --- code text ---
+    NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+    nvme0n1     259:0    0 476,9G  0 disk 
+    ├─nvme0n1p4 259:4    0     5G  0 part /          ← active (read-only)
+    ├─nvme0n1p5 259:5    0     5G  0 part            ← inactive (backup)
+    ├─nvme0n1p6 259:6    0   256M  0 part /var
+    ├─nvme0n1p7 259:7    0   256M  0 part            ← /var de la partition inactive
+    └─nvme0n1p8 259:8    0 466,3G  0 part /home
+
+
+La partition racine ne fait que 5 Go — juste assez pour l'OS et ses
+composants essentiels. Les données utilisateur, les conteneurs, les
+paquets Flatpak, tout ça vit dans /home/deck (nvme0n1p8), qui est en
+read-write.
+
+
+- Pourquoi Valve a fait ce choix
+
+Valve vend la Steam Deck comme une console, pas comme un PC. Le critère
+numéro un, c'est que tu l'allumes, ça marche, et les updates ne cassent
+jamais rien. Le rootfs read-only garantit qu'aucune modification
+utilisateur ne peut corrompre le système de base. Et le schéma A/B
+garantit qu'une mise à jour ratée ne rend jamais la machine inbootable.
+
+La conséquence directe : tout ce que tu installes via pacman sur la
+racine est effacé à la prochaine mise à jour. Tu peux bien sûr
+déverrouiller temporairement avec sudo steamos-readonly disable,
+installer tes paquets, puis remettre le verrou, mais au prochain update
+SteamOS, tout disparaît. Et avec seulement \~867 Mo de libre sur la
+partition racine, tu satureras vite.
+
+
+>>> INFO :
+Valve fournit steamos-readonly disable et steamos-readonly enable pour
+déverrouiller/verrouiller manuellement. C'est utile pour un dépannage
+ponctuel, mais c'est explicitement déconseillé pour une installation
+persistante.
+
+
+
+Le choix de Distrobox : isolation sans casser l'OS
+--------------------------------------------------
+
+Face à ce verrouillage, trois options s'offrent à moi pour installer des
+outils de hacking pour du lab (sur les principales plateformes comme
+TryHackMe, HackTheBox ou Root-Me) :
+
+
+| Méthode                                 | Persistance                                | Isolation                           | Complexité                          |
+| --------------------------------------- | ------------------------------------------ | ----------------------------------- | ----------------------------------- |
+| **Flatpak**                             | Survit aux updates                         | Forte (sandbox)                     | Faible, mais pas d'accès bas niveau |
+| **Distrobox**                           | Survit aux updates (stockage dans `/home`) | Moyenne (partage `$HOME` et réseau) | Modérée                             |
+| **`steamos-readonly disable` + pacman** | Écrasé à chaque update                     | Aucune                              | Faible mais risquée                 |
+
+
+Flatpak est la voie officielle de Valve pour les apps tierces, mais le
+sandboxing coupe justement l'accès réseau bas niveau que l'on souhaite
+pour du pentest. Le pacman sauvage est hors de question. Reste
+Distrobox.
+
+Distrobox lance un conteneur via podman en mode rootless. Le conteneur
+partage notre $HOME et le réseau de l'hôte (pratique pour développer et
+accéder au display), mais son système de fichiers est indépendant — tout
+ce que l'on y installes vit dans le stockage podman sous
+~/.local/share/containers, donc dans /home/deck, donc persistant au-delà
+des mises à jour SteamOS.
+
+Depuis SteamOS 3.5, podman et distrobox sont inclus nativement. En
+théorie, il suffit de :
+
+
+    --- code bash ---
+    distrobox-create --name kali --image docker.io/kalilinux/kali-rolling
+    distrobox-enter kali
+
+
+En théorie.
+
+
+Les premiers soucis — ou comment un paquet transitoire peut tout faire exploser
+------------------------------------------------------------------------
+
+
+- Le piège du libgl1-mesa-glx
+
+Le premier distrobox-enter kali s'arrête net à l'étape Installing basic
+packages... Error: An error occurred. Pas très bavard, distrobox.
+
+Quand on lance en --verbose, on découvre le mécanisme : distrobox-init
+exécute un script à l'intérieur du conteneur au premier enter. Ce script
+lance apt-get update puis apt-get install d'une longue liste de paquets
+(sudo, curl, gnupg2, libvte-common, libgl1-mesa-glx,
+mesa-vulkan-drivers, etc.) pour intégrer le conteneur à l'hôte. Un seul
+paquet manquant et tout le lot échoue.
+
+Et le coupable est là :
+
+
+    --- code text ---
+    E: Package 'libgl1-mesa-glx' has no installation candidate
+
+
+libgl1-mesa-glx était un paquet transitoire dans Debian/Ubuntu/Kali — un
+alias qui pointait vers la vraie bibliothèque Mesa. Il a été retiré de
+Kali rolling (et de Debian testing, et d'Ubuntu 23.10+), remplacé par
+libgl1 + libglx-mesa0. Mais le script distrobox-init n'a pas été mis à
+jour en conséquence. C'est le bug référencé dans les issues #995, #1047,
+#1132 et #1053 du dépôt distrobox.
+
+Le réseau n'est pas en cause — un podman exec kali apt-get update
+fonctionne parfaitement (Hit:1, pas Err:). C'est bien un paquet absent
+du dépôt.
+
+
+- La solution : un pre-init-hook qui crée un paquet factice
+
+Distrobox permet de passer un --pre-init-hooks qui s'exécute avant
+l'étape "Installing basic packages". L'idée : installer les vrais
+paquets de remplacement (libgl1, libglx-mesa0), puis créer un paquet
+.deb factice nommé libgl1-mesa-glx pour que distrobox-init le voie comme
+déjà installé.
+
+
+    --- code bash ---
+    distrobox-create --name kali --image docker.io/kalilinux/kali-rolling \
+      --pre-init-hooks 'echo "deb http://kali.download/kali kali-rolling main contrib non-free non-free-firmware" > /etc/apt/sources.list && apt-get update && apt-get install -y libgl1 libglx-mesa0 && mkdir -p /tmp/d/DEBIAN && printf "Package: libgl1-mesa-glx\nVersion: 99:99\nArchitecture: amd64\nDescription: dummy\n" > /tmp/d/DEBIAN/control && dpkg-deb --build /tmp/d /tmp/d.deb && dpkg -i /tmp/d.deb'
+
+
+Le dpkg-deb crée un .deb minimal avec un champ control valide. Le dpkg
+-i l'installe. Quand distrobox-init lance son apt-get install ...
+libgl1-mesa-glx ..., apt voit le paquet factice comme déjà installé et
+passe à la suite.
+
+
+>>> INFO :
+Le sources.list est forcé sur kali.download/kali en HTTP direct plutôt
+que http.kali.org/kali qui est un redirector. La raison est expliquée
+dans la section suivante.
+
+
+
+- Le second piège : les miroirs HTTPS avec certificat invalide
+
+Une fois le paquet factice en place, distrobox-init passe l'étape
+"Installing basic packages" et commence à télécharger les 246 paquets de
+la liste. Mais une bonne partie échoue :
+
+
+    --- code text ---
+    Err:38 https://kalimirror.velden.media/kali kali-rolling/main amd64 linux-sysctl-defaults all 4.16
+      SSL connection failed: error:0A000086:SSL routines::certificate verify failed
+
+
+http.kali.org est un redirector qui renvoie les téléchargements vers
+différents miroirs. La plupart utilisent HTTP et passent, mais
+kalimirror.velden.media utilise HTTPS avec un certificat que le
+conteneur de base Kali ne valide pas — au moment du premier apt-get
+install, les ca-certificates ne sont pas encore installés.
+
+Le fix : forcer un miroir HTTP direct dans le pre-init hook (déjà fait
+dans la commande ci-dessus avec kali.download/kali), puis une fois dans
+le conteneur, désactiver la vérification SSL comme filet de sécurité :
+
+
+    --- code bash ---
+    echo 'deb http://ftp.free.fr/pub/kali kali-rolling main contrib non-free non-free-firmware' > /etc/apt/sources.list
+    echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99-no-verify
+    echo 'Acquire::https::Verify-Host "false";' >> /etc/apt/apt.conf.d/99-no-verify
+    apt update
+
+
+ftp.free.fr est un miroir direct HTTP — apt ne sera jamais redirigé vers
+HTTPS. Pour un conteneur de pentest, la sécurité TLS pendant l'init
+n'est pas un souci (ou plutôt c'est acceptable).
+
+
+Finaliser l'installation — ou pourquoi /tmp refuse de coopérer
+--------------------------------------------------------------
+
+Une fois dans le conteneur (📦[deck@kali ~]$), on peut lancer
+l'installation du metapackage Kali :
+
+
+    --- code bash ---
+    apt install -y kali-linux-default
+
+
+3 Go de paquets téléchargés, la configuration commence, et là :
+
+
+    --- code text ---
+    fchownat() of /tmp failed: Operation not permitted
+    fchownat() of /tmp/.X11-unix failed: Operation not permitted
+    dpkg: error processing package systemd (--configure):
+     old systemd package postinst maintainer script subprocess failed with exit status 73
+
+
+Puis plus loin, même motif :
+
+
+    --- code text ---
+    fchownat() of /dev/snd/seq failed: Operation not permitted
+    fchmod() of /dev/kvm failed: Operation not permitted
+    dpkg: error processing package udev (--configure):
+
+
+
+- Le mécanisme : user namespace mapping et bind-mounts
+
+Distrobox bind-mounte /tmp et /dev depuis l'hôte — ce ne sont pas des
+répertoires privés au conteneur. En rootless avec user namespace, le
+"root" du conteneur (UID 0 vu de l'intérieur) est en réalité
+l'utilisateur deck (UID 1000) sur l'hôte. Le postinst de systemd tente
+un fchownat() sur /tmp pour le remettre à root:root, mais /tmp
+appartient au vrai root de l'hôte (UID 0 réel), et l'UID mappé (1000)
+n'a pas le droit de changer son propriétaire. D'où EPERM (Operation not
+permitted).
+
+C'est le pattern systématique en rootless distrobox : dès qu'un postinst
+de paquet touche à /tmp, /dev, ou tout autre bind-mount depuis l'hôte,
+il échoue.
+
+
+- Le fix : no-op sur les postinst problématiques
+
+La solution consiste à remplacer temporairement le script postinst des
+paquets concernés par un no-op (exit 0), reconfigurer le paquet, puis
+restaurer le script original :
+
+
+    --- code bash ---
+    # Sauvegarder le postinst original
+    cp /var/lib/dpkg/info/systemd.postinst /var/lib/dpkg/info/systemd.postinst.bak
+    
+    # Remplacer par un no-op
+    echo '#!/bin/sh
+    exit 0' > /var/lib/dpkg/info/systemd.postinst
+    
+    # Reconfigurer (passe sans erreur)
+    dpkg --configure systemd
+    
+    # Restaurer l'original pour les futures mises à jour
+    cp /var/lib/dpkg/info/systemd.postinst.bak /var/lib/dpkg/info/systemd.postinst
+    
+    # Finir l'installation
+    apt-get install -f
+    apt-get install -y kali-linux-default
+
+
+Pour anticiper les paquets qui vont probablement échouer (systemd, udev,
+dbus, systemd-sysv, kmod), on peut pré-appliquer le no-op en boucle :
+
+
+    --- code bash ---
+    for pkg in udev systemd dbus systemd-sysv kmod; do
+      [ -f /var/lib/dpkg/info/$pkg.postinst ] && {
+        cp /var/lib/dpkg/info/$pkg.postinst /var/lib/dpkg/info/$pkg.postinst.bak
+        echo '#!/bin/sh
+    exit 0' > /var/lib/dpkg/info/$pkg.postinst
+      }
+    done
+    apt-get install -f
+    apt-get install -y kali-linux-default
+
+
+Puis restaurer les originaux une fois l'install terminée :
+
+
+    --- code bash ---
+    for pkg in udev systemd dbus systemd-sysv kmod; do
+      [ -f /var/lib/dpkg/info/$pkg.postinst.bak ] && cp /var/lib/dpkg/info/$pkg.postinst.bak /var/lib/dpkg/info/$pkg.postinst
+    done
+
+
+
+>>> INFO :
+Le postinst de systemd fait principalement : créer des symlinks de
+services, configurer les tmpfiles, et démarrer des services. Dans un
+conteneur distrobox, systemd ne tourne pas comme PID 1 — c'est
+l'entrypoint distrobox qui est PID 1. Les actions du postinst sont donc
+cosmétiques ici. Le no-op est sans conséquence fonctionnelle.
+
+
+
+- Les prompts interactifs de debconf
+
+Pendant l'installation de kali-linux-default, plusieurs paquets
+demandent une configuration interactive via debconf. Pour un conteneur
+de pentest sur Steam Deck, voici les choix qui font sens :
+
+- macchanger — Change MAC automatically ? : no. Un conteneur n'a pas
+  d'interface physique à randomiser au boot.
+- Kismet — setuid root ? : yes. C'est le modèle standard de Kismet. Le
+  binaire capture en root via setuid, le reste tourne en utilisateur.
+  Ajouter deck et root au groupe kismet.
+- Wireshark — non-superusers capture ? : yes. Permet de capturer sans
+  être root via le groupe wireshark. C'est la pratique recommandée.
+- sslh — from inetd or standalone ? : standalone (option 2). Pas de
+  inetd dans un conteneur.
+- console-setup — encoding ? : UTF-8 (option 27). UTF-8 est Unicode —
+  c'est l'encodage variable-length d'Unicode qui couvre tous les
+  caractères de toutes les langues.
+
+
+Conclusion
+----------
+
+Ce qui m'a coûté le plus de temps n'était pas la commande à taper —
+c'était de comprendre que trois problèmes distincts s'empilaient :
+
+1. Un paquet transitoire retiré (libgl1-mesa-glx) — le bug connu de
+   distrobox avec Kali rolling, résolu par un paquet factice dans un
+   pre-init hook.
+2. Un miroir HTTPS avec certificat invalide — le redirector
+   http.kali.org qui balance vers des miroirs HTTPS non validables par
+   un conteneur sans ca-certificates, résolu en forcant un miroir HTTP
+   direct.
+3. Des postinst qui touchent aux bind-mounts de l'hôte — la limitation
+   fondamentale du rootless avec user namespace mapping, résolu par des
+   no-ops sur les postinst.
+
+Au final, le diagnostic d'un distrobox qui échoue à s'initialiser passe
+par trois questions, dans cet ordre :
+
+1. Le réseau du conteneur est-il fonctionnel ? (podman exec <name>
+   apt-get update)
+2. Un paquet de la liste distrobox-init est-il absent du dépôt ?
+   (distrobox-enter <name> --verbose et chercher Unable to locate
+   package)
+3. Un postinst échoue-t-il sur un bind-mount de l'hôte ? (chercher
+   fchownat() of /... failed: Operation not permitted)
+
+La couche 1 est rarement le problème. La couche 2 est le piège le plus
+commun avec les distros rolling. La couche 3 est celle qu'on oublie, et
+qui vous fait perdre une soirée.

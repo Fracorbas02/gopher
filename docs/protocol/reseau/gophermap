@@ -1,0 +1,31 @@
+!Réseau
+
+Documentation sur les protocoles réseaux avancés et intermédiaires
+0le triple Handshake TCP	/docs/protocol/reseau/echangesynack.txt
+
+0Le protocole TLS	/docs/protocol/reseau/protocole_tls.txt
+
+0Le protocole MPLS	/docs/protocol/reseau/protocole_mpls.txt
+I  [image] Réseau MPLS LER LSR	/docs/protocol/reseau/images/protocole_mpls/nuagempls_ler_lsr.drawio.svg
+I  [image] Réseau opérateur MPLS	/docs/protocol/reseau/images/protocole_mpls/mpls-cisco-routeur-p-pe-ce.png
+I  [image] Évolution des routes IP	/docs/protocol/reseau/images/protocole_mpls/tableroutageip.png
+I  [image] Commutation MPLS	/docs/protocol/reseau/images/protocole_mpls/commutationmpls.png
+
+0Le protocole BGP	/docs/protocol/reseau/protocole_bgp.txt
+I  [image] Routage BGP	/docs/protocol/reseau/images/protocole_bgp/bgp_routage.png
+I  [image] AS Renater	/docs/protocol/reseau/images/protocole_bgp/as_renater.png
+I  [image] AS Telia Sonera	/docs/protocol/reseau/images/protocole_bgp/as_teliasonera.png
+I  [image] Organismes gestion AS	/docs/protocol/reseau/images/protocole_bgp/map-as_iana.svg
+I  [image] AS announced on internet	/docs/protocol/reseau/images/protocole_bgp/internet_as.svg
+I  [image] BGP simple echange de route	/docs/protocol/reseau/images/protocole_bgp/bgp_simpleshareroute.svg
+I  [image] BGP Relai annonces	/docs/protocol/reseau/images/protocole_bgp/bgp_externalforwarding.svg
+I  [image] BGP Relai annonces 2	/docs/protocol/reseau/images/protocole_bgp/bgp_externalforwarding2.svg
+I  [image] Stratégie de routage : gérer le trafic	/docs/protocol/reseau/images/protocole_bgp/bgp_strategieroutage.svg
+I  [image] BGP iBGP eBGP	/docs/protocol/reseau/images/protocole_bgp/bgp_ibgp_ebgp.svg
+I  [image] BGP AS_PATH	/docs/protocol/reseau/images/protocole_bgp/bgp_as_path.svg
+I  [image] BGP NEXT_HOP	/docs/protocol/reseau/images/protocole_bgp/bgp_next_hop.svg
+I  [image] BGP LOCAL_PREF	/docs/protocol/reseau/images/protocole_bgp/bgp_local_pref.svg
+I  [image] BGP MED	/docs/protocol/reseau/images/protocole_bgp/bgp_med.svg
+
+1Retour : Protocoles	/docs/protocol
+.

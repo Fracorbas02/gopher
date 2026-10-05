@@ -1,0 +1,501 @@
+========================================================================
+find : au-delà de la recherche de fichiers, le couteau suisse du filesystem
+========================================================================
+
+Le 2026-10-01 / Tags : Linux, tools, system
+
+
+Quotidiennement, j'utilise la commande find sans vraiment penser plus
+loin. Puis, des conversations avec une IA passent et on se rend compte
+que la commande find que ces LLM utilisent sont complexes. Trop
+complexe, je ne comprend que la moitié. Donc je recherche et voici un
+petit article sur jusqu'où on peut aller.
+
+
+
+On a tous tapé find . -name "*.log" un jour sans y penser plus loin.
+Puis un beau jour on découvre -exec, et on se rend compte que find n'est
+pas une commande de recherche : c'est un langage de filtres et d'actions
+qui évalue une expression sur chaque fichier du système. Le but de cet
+article n'est pas de refaire le man find (que je vous encourage quand
+même à parcourir), mais de poser le modèle mental correct. Parce qu'une
+fois qu'on a compris comment find évalue son expression, les 40 options
+qu'on n'utilise jamais deviennent lisibles toutes seules.
+
+
+Je pars du principe que vous êtes à l'aise en ligne de commande. Les
+exemples tournent sous GNU findutils (donc Arch, Debian, RHEL, tout ce
+qui n'est pas BusyBox ou macOS par défaut) et j'utilise des cas concrets
+d'admin, parce que c'est là que find passe du statut d'outil pratique à
+celui d'outil irremplaçable.
+
+
+Le modèle mental : une expression, pas une commande
+---------------------------------------------------
+
+C'est LE déclic à avoir. find ne prend pas des « options » dans le sens
+où ls en prend. Il prend une expression composée de trois familles de
+briques, évaluée de gauche à droite pour chaque fichier rencontré :
+
+
+| Famille        | Rôle                                                                 | Exemples                                          |
+| -------------- | -------------------------------------------------------------------- | ------------------------------------------------- |
+| **Tests**      | renvoient vrai ou faux sur le fichier courant                        | `-name`, `-type`, `-size`, `-mtime`               |
+| **Actions**    | font quelque chose, et renvoient vrai/faux selon leur code de sortie | `-print`, `-delete`, `-exec`, `-ls`               |
+| **Opérateurs** | combinent les briques                                                | `-a` (et, implicite), `-o` (ou), `!` (non), `( )` |
+
+
+Deux conséquences directes, souvent sources de bugs :
+
+1. L'ordre compte. find évalue de gauche à droite et court-circuite :
+   dans find . \( -type f -o -type l \) -name "*.conf", les parenthèses
+   sont indispensables, car sans elles -a (implicite) est prioritaire
+   sur -o et l'expression veut dire autre chose.
+2. Si aucune action n'est spécifiée, -print est ajouté implicitement —
+   c'est pour ça que find . -name "*.log" affiche quelque chose. Mais
+   dès qu'on ajoute -exec ou -delete, l'implicite disparaît : si on veut
+   à la fois filtrer et exécuter, il faut réécrire -print explicitement.
+
+
+    --- code mermaid ---
+    flowchart TD
+        F["find &lt;chemins&gt;"] --> E1["Test 1<br/>(-type f ?)"]
+        E1 -->|vrai| E2["Test 2<br/>(-name *.log ?)"]
+        E1 -->|faux| NEXT["fichier suivant"]
+        E2 -->|faux| NEXT
+        E2 -->|vrai| A["Action<br/>(-print, -exec...)"]
+        A --> NEXT
+
+
+Le schéma de la ligne de commande, une fois pour toutes :
+
+
+    --- code bash ---
+    find [chemins] [tests/actions/opérateurs]
+    # find est le seul argument obligatoire... et le chemin par défaut est le répertoire courant
+
+
+
+>>> ASTUCE : find sans argument ?
+find tout court, sans chemin et sans expression, liste tout le
+répertoire courant récursivement. C'est un piège classique après un
+mauvais copier-coller. Le premier argument qui ne commence pas par - est
+considéré comme un chemin de départ, pas comme un motif.
+
+
+
+Les tests qui font 90 % du travail
+----------------------------------
+
+
+- -name, -iname : le nom, avec ou sans casse
+
+
+    --- code bash ---
+    # Tous les .conf — attention : -name matche sur le basename, pas le chemin complet
+    find /etc -name "*.conf"
+    
+    # Insensible à la casse : matche .conf, .CONF, .Conf...
+    find /etc -iname "*.conf"
+    
+    # Pour matcher sur le chemin COMPLET : -path (et son jumeau insensible -ipath)
+    find /etc -path "*ssh*config*"
+
+
+Le piège classique : find . -name .log sans guillemets. Le shell
+développe .log avant que find ne le voie et si le répertoire courant
+contient un seul .log, il devient le motif ; s'il en contient plusieurs,
+vous avez une erreur de syntaxe. Toujours citer : -name "*.log".
+
+
+- -type : la nature du nœud
+
+
+    --- code bash ---
+    find /var -type f -name "*.log"   # fichiers réguliers
+    find /var -type d                  # répertoires
+    find /var -type l                  # liens symboliques
+    find / -type s                      # sockets
+
+
+
+| Code      | Signification                 |
+| --------- | ----------------------------- |
+| `f`       | fichier régulier              |
+| `d`       | répertoire                    |
+| `l`       | lien symbolique               |
+| `s`       | socket                        |
+| `p`       | tube nommé (FIFO)             |
+| `b` / `c` | périphérique bloc / caractère |
+
+
+
+- -size : la taille
+
+
+    --- code bash ---
+    find /var/log -type f -size +100M   # strictement PLUS de 100 Mio
+    find /var/log -type f -size -10k    # strictement MOINS de 10 Kio
+    find /var/log -type f -size 50M     # exactement 50 Mio (arrondi au bloc supérieur — rarement utile sans + ou -)
+
+
+Le préfixe est ce qui compte : + = plus que, - = moins que, rien =
+exactement (au bloc près, donc à éviter). Les suffixes k/M/G sont des
+puissances de 2 (Kio, Mio, Gio).
+
+
+- -mtime, -mmin, -newer : le temps
+
+Ici aussi le préfixe +/- change tout :
+
+
+    --- code bash ---
+    # Modifié il y a PLUS de 30 jours (donc : vieux)
+    find /var/log -type f -mtime +30
+    
+    # Modifié il y a MOINS de 60 minutes (donc : frais)
+    find /var/log -type f -mmin -60
+    
+    # Modifié il y a EXACTEMENT 3 jours — Utile lors de compromission et que l'on recherche des traces très précises
+    find /var/log -type f -mtime 3
+
+
+Le cas d'usage typique — purger les logs d'un serveur :
+
+
+    --- code bash ---
+    # ⚠️ destructif : supprime les .gz de plus de 90 jours, à tester d'abord avec -print
+    find /var/log -type f -name "*.gz" -mtime +90 -delete
+
+
+
+>>> NOTE : Comment tester un `-delete` sans risquer sa vie
+La règle d'or : on écrit d'abord la commande avec -print (ou -ls pour
+avoir les détails inodes/permissions), on relit la sortie, et seulement
+ensuite on remplace -print par -delete. -delete échoue silencieusement
+sur les répertoires non vides, et il implique -depth : l'ordre
+d'évaluation est modifié par sa présence.
+
+
+Enfin, -newer compare à un fichier de référence, c'est très pratique
+pour "ce qui a changé depuis ma dernière intervention" :
+
+
+    --- code bash ---
+    # Tout ce qui a été modifié plus récemment que le fichier repère
+    touch /tmp/reference
+    find /etc -type f -newer /tmp/reference
+
+
+
+- -maxdepth / -mindepth : contenir la récursion
+
+
+    --- code bash ---
+    # Limite la profondeur à 1 : le contenu direct de /etc, sans descendre
+    find /etc -maxdepth 1 -type f
+    
+    # mindepth 1 exclut le point de départ lui-même, c' le combo classique pour exclure "."
+    find . -mindepth 1 -maxdepth 1 -type d
+
+
+-maxdepth est une option globale : dans le man, elle figure dans la
+section GNU OPTIONS, pas TESTS. Elle se place après les chemins et avant
+le reste de l'expression, et son effet porte sur toute la traversée.
+
+
+Les actions : là où find devient dangereux (dans le bon sens)
+-------------------------------------------------------------
+
+
+- -print et -ls
+
+-print affiche le chemin, -ls affiche le format long équivalent à ls
+-dils. Ce dernier est mon réflexe pour auditer ce que matche une
+expression avant toute action destructive.
+
+
+- -exec : les trois terminaisons
+
+On a tous appris -exec ... \; par copier-coller sans comprendre le \;.
+Voici ce qui se passe réellement, et les alternatives.
+
+
+- \; — un appel par fichier
+
+
+    --- code bash ---
+    find ./src/javascript -type f -name '*.js' -exec wc -l {} \;
+
+
+Pour chaque fichier matché, find fork-execute un nouveau processus wc -l
+<fichier>. Douze fichiers, douze invocations de wc. Le {} est remplacé
+par le chemin du fichier courant, donc un seul à la fois.
+
+Le \ protège le ; du shell : sans lui, le shell intercepte le ; comme
+séparateur de commandes et find ne le voit jamais arriver. '...' ou ";"
+fonctionnent aussi.
+
+
+- + — un appel pour tous les fichiers
+
+
+    --- code bash ---
+    find ./src/javascript -type f -name '*.js' -exec wc -l {} +
+
+
+Ici {} est remplacé par la liste entière des chemins matchés, comme si
+vous tapiez wc -l f1.js f2.js f3.js.... Un seul processus, et wc rend
+son total. C'est l'équivalent d'un xargs intégré.
+
+Deux subtilités :
+
+- {} doit être le dernier argument avant le + (c'est une contrainte de
+  findutils). Pour les commandes qui veulent la cible au milieu, on
+  utilise l'option de destination de la commande elle-même : -exec cp -t
+  /dest/ {} +.
+- Sur de très grosses arborescences, find découpe la liste en lots pour
+  rester sous ARG_MAX — vous pouvez alors avoir plusieurs appels, donc
+  plusieurs sous-totaux avec wc.
+
+
+- -execdir — la variante sûre
+
+
+    --- code bash ---
+    find . -name '*.tmp' -execdir rm {} \;
+
+
+Même logique que -exec (et accepte aussi +), mais la commande s'exécute
+depuis le répertoire contenant le fichier, et {} ne contient que
+./nomfichier. Deux bénéfices : les noms de fichiers avec caractères
+exotiques posent moins de soucis, et surtout c'est la forme recommandée
+pour tout ce qui est destructif, elle ferme la porte aux injections de
+chemin malveillants qu'un -exec rm classique peut subir si un répertoire
+contient un fichier nommé -rf ou un chemin piégé.
+
+
+- -ok : le mode parano
+
+-ok est un -exec qui demande confirmation avant chaque exécution
+(lecture sur stdin, attend y). Idéal quand on hésite encore sur le
+filtre :
+
+
+    --- code bash ---
+    find /var/tmp -type f -mtime +90 -ok rm {} \;
+
+
+
+>>> NOTE : Les indices GNU complémentent bien find
+-printf permet de formater la sortie comme on veut, et rend find
+autonome pour produire des rapports :
+
+
+    --- code bash ---
+    # chemin + taille en octets + date de modification, séparés par tabulation
+    find /var/log -type f -printf '%p\t%s octets\t%TY-%Tm-%Td\n' | column -t
+
+
+Les spécificateurs de date (%TY, %Tm...) suivent la syntaxe strftime.
+man find section -printf pour la liste complète.
+
+
+
+Les opérateurs : assembler les briques
+--------------------------------------
+
+Sans opérateur explicite, tout est combiné par un ET implicite. Le
+premier réflexe pour écrire un filtre complexe : expliciter ce qu'on
+écrit, avec des parenthèses systématiques, elles coûtent deux caractères
+et évitent les mauvaises surprises de priorité (-a est plus prioritaire
+que -o, comme && est plus prioritaire que ||).
+
+
+    --- code bash ---
+    # ET implicite : les fichiers .conf de plus de 10 Kio
+    find /etc -type f -name "*.conf" -size +10k
+    
+    # OU explicite : sockets OU FIFO
+    find /var -type s -o -type p
+    
+    # Le piège classique : « les .conf OU .cnf de plus de 10k »
+    # FAUX — le -a implicite lie "name .conf" au reste, le -o ne porte que sur le premier test
+    find /etc -name "*.conf" -o -name "*.cnf" -size +10k
+    # CORRECT
+    find /etc \( -name "*.conf" -o -name "*.cnf" \) -size +10k
+    
+    # NÉGATION : les répertoires qui ne s'appellent pas .git
+    find . -type d ! -name ".git"
+    
+    # Un schéma courant : exclure une branche entière de l'arborescence
+    find /var/www \( -name node_modules -o -name .git \) -prune -o -type f -name "*.conf" -print
+
+
+Cette dernière mérite une explication, car -prune est l'option la plus
+mystérieuse du man :
+
+- -prune est une action qui renvoie toujours vrai et dit à find : « ne
+  descends pas dans ce répertoire » ;
+- le motif \( ... \) -prune -o <filtre> -print se lit : « si c'est un
+  node\_modules ou un .git, coupe l'exploration ; sinon, applique le
+  filtre et affiche » ;
+- le -print final est indispensable : sans action explicite après le -o,
+  l'implicite disparaît et rien ne s'affiche.
+
+Sur un node_modules, la différence de performance est spectaculaire :
+-prune évite de traverser des dizaines de milliers d'entrées.
+
+
+    --- code mermaid ---
+    flowchart TD
+        D["Répertoire courant"] --> T{"node_modules<br/>ou .git ?"}
+        T -->|oui| P["-prune<br/>on ne descend pas"]
+        T -->|non| F{"-type f et<br/>-name *.conf ?"}
+        F -->|vrai| O["-print"]
+        F -->|faux| S["fichier suivant"]
+        P --> S
+        O --> S
+
+
+
+find et xargs : le tandem
+-------------------------
+
+-exec ... + couvre la plupart des besoins de traitement par lots. Le
+pipe vers xargs reste pertinent quand on veut du contrôle supplémentaire
+: parallélisme (-P), filtrage intermédiaire, ou réutilisation de la
+sortie ailleurs.
+
+Le point critique est le séparateur. La sortie par défaut de find sépare
+les chemins par des sauts de ligne, ce qui casse dès qu'un nom de
+fichier contient lui-même un saut de ligne (rarissime) ou un espace
+(moins rare que ça). La paire saine est -print0 / -0 :
+
+
+    --- code bash ---
+    # ⚠️ fragile : casse sur "rapport final.txt"
+    find . -name "*.log" | xargs grep -l ERROR
+    
+    # Robuste : le séparateur devient le caractère nul, impossible dans un nom de fichier
+    find . -name "*.log" -print0 | xargs -0 grep -l ERROR
+    
+    # Parallélisé : 4 grep concurrents
+    find . -name "*.log" -print0 | xargs -0 -P4 -n 50 grep -l ERROR
+
+
+Règle simple : -print0 côté find, -0 côté xargs, et vous ne pensez plus
+jamais aux noms de fichiers bizarres.
+
+
+Le fameux : compter les lignes d'un projet
+------------------------------------------
+
+Retour sur le cas qui a déclenché cet article : compter les lignes JS
+d'un projet
+| Oui, je savais compter les lignes de chaque fichier avec le \;, mais
+| pas tout d'un coup... Tout cet article découle uniquement de ça
+
+
+    --- code bash ---
+    # Version naïve : un wc par fichier, pas de total
+    find ./src/javascript -type f -name '*.js' -exec wc -l {} \;
+    
+    # Avec + : un seul appel à wc, qui rend son total
+    find ./src/javascript -type f -name '*.js' -exec wc -l {} +
+    
+    # Et pour tout le repo, en excluant node_modules
+    find . -name node_modules -prune -o -type f -name '*.js' -print0 | xargs -0 wc -l
+
+
+Et la variante que je préfère dans un dépôt git : git ls-files exclut
+nativement tout ce qui est ignoré, c'est plus concis et plus fiable
+qu'un find re-écrit à chaque fois :
+
+
+    --- code bash ---
+    git ls-files '*.js' | xargs wc -l
+
+
+
+>>> ATTENTION : Attention au dernier cas
+git ls-files sort un chemin par ligne, sans séparateur nul. C'est
+acceptable dans un dépôt git (les noms exotiques y sont rares) ; sinon,
+git ls-files -z | xargs -0 wc -l existe aussi et ferme le sujet.
+
+
+
+Recettes prêtes à l'emploi
+--------------------------
+
+
+    --- code bash ---
+    # Purger les archives de plus de 90 jours (⚠️ destructif : tester d'abord avec -ls)
+    find /var/log -type f -name "*.gz" -mtime +90 -delete
+    
+    # Les fichiers de plus de 100 Mio, triés par taille décroissante
+    find /var -type f -size +100M -printf '%s\t%p\n' | sort -rn | head
+    #   %s = taille en octets, %p = chemin — sort -rn trie numériquement
+    
+    # Les répertoires vides, à la racine d'un projet (sans descendre dans node_modules)
+    find . -name node_modules -prune -o -type d -empty -print
+    
+    # Tout ce qui ne m'appartient pas dans mon home
+    find ~ ! -user "$USER" -ls 2>/dev/null
+    
+    # Fichiers modifiés depuis le dernier backup (repère temporel par fichier)
+    find /etc -type f -newer /var/backups/etc.last
+    
+    # Les liens symboliques cassés
+    find /etc -xtype l
+    #   -xtype est le test « le type de la CIBLE » : sur un lien, c'est le type
+    #   du fichier pointé. Combiné à -type l, ça matche les liens dont la cible n'existe pas.
+    
+    # Exécuter une commande dans chaque répertoire matché (ici : droits d'un serveur web)
+    find /var/www -type d -execdir chmod 755 {} \;
+    find /var/www -type f -execdir chmod 644 {} \;
+    #   \; et non + : chmod accepterait les lots, mais execdir + change le contexte
+    #   et le gain est ici négligeable — lisibilité d'abord.
+
+
+
+Quand find n'est PAS le bon outil
+---------------------------------
+
+Honnêteté oblige : il y a des cas où il faut arrêter de marteler find.
+
+- Chercher un contenu dans un dépôt de code : c'est le job de grep -r ou
+  mieux, ripgrep (rg), qui ignore nativement les fichiers ignorés par
+  git. find ... | xargs grep reste valable hors dépôt git ou pour des
+  filtres fins sur les métadonnées.
+- Recherche par nom dans tout le système : locate/plocate interroge une
+  base indexée (mise à jour par updatedb, souvent en cron/timer systemd)
+  — quasi instantané, mais seulement à jour au dernier passage de
+  l'index. find reste la vérité terrain en temps réel.
+- Opérations complexes sur les résultats : dès qu'il faut agréger,
+  trier, croiser des données, la sortie de find se pipe joyeusement vers
+  awk/sort/uniq — c'est une vertu, pas un défaut.
+
+
+    --- code mermaid ---
+    flowchart TD
+        Q{"Quel est le besoin ?"} --> N{"Par nom / métadonnée,<br/>en temps réel ?"}
+        N -->|oui| F["find"]
+        N -->|contenu de fichiers| G["grep -r ou rg"]
+        N -->|nom, souvent, système entier| L["plocate"]
+        F --> X{"Traitement par lots<br/>sur les résultats ?"}
+        X -->|simple, même commande| EP["-exec ... +"]
+        X -->|parallèle / filtrage intermédiaire| XP["-print0 | xargs -0"]
+        X -->|destructif| ED["-execdir, après -ls de contrôle"]
+
+
+
+Pour aller plus loin
+--------------------
+
+- man find — la section OPERATORS vaut une lecture attentive, tout y
+  est.
+- find --version pour vérifier que vous êtes bien sur GNU findutils
+  (BusyBox find, notamment sur Alpine, supporte un sous-ensemble des
+  options ci-dessus — les -printf et -execdir y sont notamment absents
+  ou limités).

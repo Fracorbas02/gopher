@@ -1,0 +1,431 @@
+========================================================================
+RX 9070 XT eGPU sur Thunderbolt 4 : ou comment AMD m'a fait perdre trois soirées
+========================================================================
+
+Le 2026-09-08 / Tags : informatique, open-source, system, Linux, GPU, eGPU
+
+
+Voilà, j'ai craqué. Après ma RX 6850M XT qui commençait à peiner sous
+les jeux modernes, je me suis dit qu'une RX 9070 XT en eGPU, c'est
+l'avenir : 48,7 TFLOPS, 16 Go de GDDR6, RDNA 4, le bonjour. Un dock
+Aoostar AG03 en Thunderbolt 5 (négocié en TB4 sur mon laptop), un câble
+certifié, et c'est parti pour la paradise du gaming portable.
+
+Spoiler : c'était pas la paradise.
+
+
+
+Avant de commencer, une petite mise en bouche ne fait pas de mal : le
+dock Aoostar AG03 est officiellement listé comme incompatible avec la RX
+9070 XT par le constructeur lui-même. Évidemment, je l'ai appris après
+avoir commandé.
+
+Mais le vrai problème n'est pas le dock. C'est ce qui se passe entre le
+GPU, le tunnel PCIe Thunderbolt, et le driver amdgpu de Linux. Trois
+soirées de debug plus tard, avec l'aide de deux assistants IA (Claude et
+Mistral Vibe), on a identifié quatre bugs distincts qui s'empilent comme
+des matryoshkas. Deux sont résolus, un est contourné, et le dernier est
+un bug driver AMD qui n'a toujours pas été corrigé.
+
+Allez, c'est parti.
+
+
+Le matériel
+-----------
+
+| Composant | Modèle |
+|---|---|
+| GPU | AMD Radeon RX 9070 XT (ASUSTeK, Navi 48 / RDNA4) |
+| Dock eGPU | Aoostar AG03 (Thunderbolt 5, négocié en TB4) |
+| Laptop | Samsung Galaxy Book, Intel i7-1360P (13th gen), contrôleur TB4 Intel |
+| OS | Arch Linux, kernel 7.2.3-arch1-2, linux-firmware 20260810-2 |
+
+Le dock AG03 utilise un switch PCIe AMD (1002:1478/1479) qui interagit
+avec le root port Thunderbolt Intel du laptop. C'est déjà une recette
+pour des surprises, mais comme on va le voir, le switch n'est pas le
+coupable principal.
+
+
+Bug #1 : Le crash fatal au boot — AER UnsupReq (RÉSOLU)
+-------------------------------------------------------
+
+Le GPU s'initialise, amdgpu se charge, les écrans s'allument... et 12
+secondes plus tard, tout meurt. Le kernel bascule le périphérique en
+pci_channel_io_perm_failure et la carte devient irrécupérable.
+
+
+    --- code ---
+    [   12.179391] pcieport 0000:00:07.2: AER: Uncorrectable (Non-Fatal) error received from 0000:38:00.0
+    [   12.179464] pcieport 0000:38:00.0:    [20] UnsupReq               (First)
+    [   12.179472] pcieport 0000:38:00.0: AER:   TLP Header: 0x34000000 0x39000010 0x00000000 0x80008000
+    [   12.179646] amdgpu 0000:39:00.0: pci_channel_io_perm_failure: state(3)!!
+    [   12.179675] pcieport 0000:38:00.0: AER: device recovery failed
+
+
+
+- Le diagnostic
+
+En décodant l'en-tête TLP : 0x34000000 = Fmt 001 (3DW avec données),
+Type 10100 (Message PCIe). Le code message 0x80 (dans DW3) est en dehors
+de la plage standard PCIe (qui s'arrête à 0x7F pour les vendor-defined).
+C'est un message vendor-specific AMD que le GPU envoie à travers le
+switch PCIe du dock, mais le root port Thunderbolt Intel ne le comprend
+pas. Il répond UnsupReq, l'AER (Advanced Error Reporting) met le
+périphérique en état fatal, et la carte meurt.
+
+Le "wait" et le "reset" qu'on voit dans les logs, ce n'est pas deux
+problèmes, c'est la même chaîne : le GPU reset casse le tunnel TB, et la
+reprise échoue parce que le tunnel ne se rétablit pas.
+
+
+- La solution
+
+
+    --- code bash ---
+    # Ajouter dans /etc/default/grub, ligne GRUB_CMDLINE_LINUX_DEFAULT :
+    pci=noaer
+
+
+pci=noaer désactive l'AER. Le message non supporté est toujours envoyé,
+mais le noyau ne tue plus le périphérique. C'est un workaround, pas un
+fix — le vrai correctif devrait être côté driver amdgpu pour ne pas
+envoyer de messages vendor-specific à travers un tunnel qui ne les
+supporte pas. Mais en attendant, ça garde la carte en vie.
+
+
+Bug #2 : BAR limité à 256 Mo au lieu de 16 Go (RÉSOLU)
+------------------------------------------------------
+
+La carte a 16 Go de VRAM, le BIOS supporte ReBAR, tout est activé... et
+pourtant le GPU démarre avec 256 Mo de BAR. Les performances sont
+catastrophiques et la VRAM est inutilisable.
+
+
+    --- code ---
+    amdgpu 0000:39:00.0: BAR 0 [mem size 0x400000000 64bit pref]: can't assign; no space
+    amdgpu 0000:39:00.0: Not enough PCI address space for a large BAR.
+    amdgpu 0000:39:00.0: [drm] Detected VRAM RAM=16304M, BAR=256M
+
+
+
+- Le mécanisme
+
+Le BIOS exerce le ReBAR pendant le POST et assigne 16 Go de BAR
+prefetchable. On le voit clairement dans les logs :
+
+
+    --- code ---
+    [    0.790327] pci 0000:39:00.0: BAR 0 [mem 0x6000000000-0x63ffffffff 64bit pref]  ← 16 Go, assigné par le BIOS
+
+
+Mais ensuite, le noyau ré-énumère le tunnel Thunderbolt, resette le
+lien, et ne consulte jamais la capacité ReBAR pendant la ré-énumération.
+Le GPU retombe à 256 Mo :
+
+
+    --- code ---
+    [    9.262905] amdgpu 0000:39:00.0: BAR 0 [mem size 0x400000000 64bit pref]: can't assign; no space
+    [    9.263028] amdgpu 0000:39:00.0: Not enough PCI address space for a large BAR.
+    [    9.263053] amdgpu 0000:39:00.0: [drm] Detected VRAM RAM=16304M, BAR=256M
+
+
+C'est exactement le problème décrit par u/Reedemer0fSouls sur Reddit :
+le noyau ne consulte pas la capacité ReBAR pendant l'énumération à
+chaud. Le BIOS le fait pendant le POST, mais le noyau resette tout et
+perd l'assignation.
+
+
+- La solution
+
+
+    --- code bash ---
+    # Ajouter dans /etc/default/grub :
+    thunderbolt.host_reset=0
+
+
+Ce paramètre demande au module Thunderbolt de ne pas resetter le host
+router USB4 lors de l'initialisation. Le tunnel PCIe et les assignations
+BAR du BIOS sont préservés.
+
+
+>>> ATTENTION :
+Ce paramètre ne fonctionne qu'en cold-plug : le dock eGPU doit être
+branché et allumé avant le boot. Si vous branchez le dock après le boot
+(hotplug), le BIOS n'aura pas fait le ReBAR et le workaround ne
+s'applique pas.
+
+
+Après ce paramètre, le BAR passe à 16 Go :
+
+
+    --- code ---
+    Region 0: Memory at 6000000000 (64-bit, prefetchable) [size=16G]
+    BAR 0: current size: 16GB, supported: 256MB 512MB 1GB 2GB 4GB 8GB 16GB
+
+
+
+Bug #3 : Race condition au boot — GRUB vs amdgpu (RÉSOLU)
+---------------------------------------------------------
+
+Celui-là, c'est une race condition subtile qu'on a mis du temps à
+isoler. Au boot, GRUB et le driver amdgpu tentaient tous deux
+d'initialiser le GPU en même temps. GRUB, pour afficher son menu, envoie
+des commandes au GPU via le VBIOS. Pendant ce temps, le driver amdgpu du
+kernel commence son initialisation. Les deux se marchent sur les pieds,
+le GPU se resette en plein milieu de l'init, et selon le timing, soit ça
+plante, soit ça démarre avec un BAR foireux, soit ça marche par chance.
+
+C'est exactement le même type de bug que la Steam Controller — une race
+condition qui n'existe dans aucun des deux composants isolés, mais dans
+l'ordonnancement de leurs opérations.
+
+
+- La solution : un service systemd pour sérialiser l'init
+
+Pour éviter que GRUB et amdgpu ne se battent, on configure un service
+systemd qui retarde l'initialisation du GPU jusqu'à ce que GRUB ait
+fini. L'idée est de désactiver le module amdgpu au boot, puis de le
+charger manuellement une fois que le système est stable.
+
+
+    --- code bash ---
+    # /etc/modprobe.d/amdgpu-delay.conf
+    # Désactiver le chargement automatique d'amdgpu
+    blacklist amdgpu
+
+
+Puis un service systemd qui charge le module après le boot :
+
+
+    --- code ini ---
+    # /etc/systemd/system/amdgpu-delay.service
+    [Unit]
+    Description=Delay amdgpu module loading until boot is stable
+    After=graphical.target
+    Wants=graphical.target
+    
+    [Service]
+    Type=oneshot
+    ExecStartPre=/bin/sleep 3
+    ExecStart=/sbin/modprobe amdgpu
+    RemainAfterExit=yes
+    
+    [Install]
+    WantedBy=multi-user.target
+
+
+
+    --- code bash ---
+    sudo systemctl enable amdgpu-delay.service
+
+
+Le sleep 3 laisse le temps à GRUB et au tunnel Thunderbolt de se
+stabiliser avant que amdgpu ne commence son init. Après ça, le GPU
+s'initialise proprement à chaque boot.
+
+
+>>> INFO :
+Ce n'est pas la solution la plus élégante, mais c'est celle qui marche.
+Un vrai fix serait que amdgpu attende que le tunnel TB soit stable avant
+de commencer l'init, mais ça nécessite un patch kernel.
+
+
+
+Bug #4 : SMU driver/firmware mismatch — crash sous charge (NON RÉSOLU)
+----------------------------------------------------------------------
+
+C'est le dernier bug, et celui qu'on ne peut pas corriger avec des
+paramètres noyau. Le driver amdgpu supporte l'interface SMU (System
+Management Unit) version 0x2E (46), mais le firmware de la carte utilise
+l'interface 0x33 (51).
+
+
+    --- code ---
+    amdgpu 0000:39:00.0: smu driver if version = 0x0000002e, smu fw if version = 0x00000033
+
+
+Le SMU s'initialise au boot ("SMU is initialized successfully!"), mais
+sous charge, les transitions de power state font crasher le GPU de
+manière fatale : écran rouge, puis noir, système complètement figé, hard
+reboot nécessaire. La carte se limite à 150W au lieu de ses 318W
+nominaux, la latence est phénoménale, et les écrans freezent lors des
+transitions de power state.
+
+
+- Ce qui n'a pas marché
+
+| Paramètre | Résultat |
+|---|---|
+| `amdgpu.gfxoff=0` | Paramètre inexistant sur ce noyau (ignoré silencieusement) |
+| `amdgpu.pg_mask=0` | Désactive le power gating de tous les blocs IP, y compris le VCN. Le GPU refuse de s'initialiser : `VCN[0] is not responding`, `probe failed with error -110` |
+| `echo high > power_dpm_force_performance_level` | Force le GPU en mode haute performance. Le jeu devient réactif, mais le crash finit par arriver lors d'un pic de charge |
+
+
+- Le workaround temporaire
+
+Forcer le GPU en mode performance haute permet de jouer pendant un
+moment :
+
+
+    --- code bash ---
+    echo high | sudo tee /sys/class/drm/card0/device/power_dpm_force_performance_level
+
+
+Mais dès qu'un pic de charge arrive (chargement de sauvegarde, scène
+cinématique), le SMU tente une transition de power state, et c'est le
+crash.
+
+
+- Pourquoi c'est un bug driver et pas un bug matériel
+
+Le faisceau d'indices est très clair :
+
+- Quatre machines différentes, quatre docks différents, deux OS (Linux
+  et Windows pour certains), deux cartes (RX 9060 XT et RX 9070 XT) —
+  toujours le même crash.
+- Un Intel Arc B580 dans le même dock et le même laptop ne crash pas.
+- Une RX 6900 XT, une Quadro P400, une RTX 5060 Ti fonctionnent aussi.
+- Les mêmes vidéos YouTube montrent la 9070 XT fonctionner sur ce
+  dock... sous Windows.
+
+Donc ce n'est pas AMD en général, ce n'est pas ma carte en particulier,
+ce n'est pas le dock. C'est RDNA 4 + driver amdgpu Linux + tunnel PCIe
+Thunderbolt. Plus la carte est récente, plus elle utilise des mécanismes
+PCIe que le tunnel TB ne transporte pas correctement, et plus le driver
+amdgpu a de mal à gérer ces mécanismes à travers un tunnel.
+
+Une RX 6700 XT de 2021 marcherait du premier coup. RDNA 3 ?
+Probablement. RDNA 4 ? Pas encore.
+
+
+>>> INFO :
+amdgpu contient déjà du code de contournement spécifique au Thunderbolt.
+Un patch noyau de 2021 s'intitule littéralement : "amdgpu: use MMIO to
+init atombios if device is Thunderbolt / USB4 attached". Son auteur
+écrivait ne pas savoir exactement pourquoi, mais que quand le BAR I/O
+est assigné en Thunderbolt, l'init d'amdgpu échoue. Donc AMD sait que le
+tunnel TB se comporte différemment d'un lien direct — il y a juste des
+trous dans le support.
+
+
+
+- Le test qui tranche
+
+Si vous êtes dans ce cas, il y a un test que personne n'a jamais fait et
+qui répond à la question : installez Windows sur une partition, branchez
+le dock, lancez un jeu.
+
+| Résultat | Conclusion |
+|---|---|
+| Ça marche | Bug amdgpu. Corrigeable. Le matériel est bon. Signalez le bug. |
+| Ça plante pareil | Plus profond. Retournez le dock. |
+
+Si ça marche sous Windows, le bug est côté driver Linux et doit être
+signalé sur gitlab.freedesktop.org/drm/amd/-/issues
+(https://gitlab.freedesktop.org/drm/amd/-/issues). C'est là que les
+développeurs AMD Linux travaillent, et ils sont réactifs sur les
+rapports bien documentés. À joindre : le dmesg complet avec la séquence
+de crash, le fichier /sys/class/drm/card0/device/devcoredump/data, la
+topologie lspci -tv, et le fait que ça marche sous Windows sur le même
+matériel.
+
+
+Les paramètres noyau finaux
+---------------------------
+
+Après toutes ces itérations, voilà la ligne GRUB qui garde le GPU en vie
+au boot :
+
+
+    --- code bash ---
+    # /etc/default/grub
+    GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet pcie_ports=native pci=assign-busses,hpbussize=0x33,realloc,hpmmiosize=128M,hpmmioprefsize=64M,noaer thunderbolt.host_reset=0 amdgpu.runpm=0 pcie_aspm=off"
+
+
+| Paramètre | Rôle | Bug résolu |
+|---|---|---|
+| `pci=noaer` | Désactive l'AER, empêche le crash fatal au boot | Bug #1 (UnsupReq) |
+| `thunderbolt.host_reset=0` | Préserve le ReBAR fait par le BIOS (16 Go au lieu de 256 Mo) | Bug #2 (BAR) |
+| `amdgpu.runpm=0` | Désactive le runtime PM du GPU | Stabilité générale |
+| `pcie_aspm=off` | Désactive l'ASPM PCIe | Stabilité générale |
+| `pcie_ports=native` | Force la gestion native des ports PCIe | Hotplug TB |
+| `pci=assign-busses,hpbussize=0x33,realloc,...` | Paramètres d'allocation PCIe pour le tunnel TB | Hotplug TB |
+
+Plus le service systemd pour sérialiser l'init (Bug #3) et le echo high
+en workaround pour le SMU (Bug #4).
+
+
+Ce que la communauté a trouvé
+-----------------------------
+
+Le bug n'est pas isolé. Plusieurs utilisateurs sur les forums Arch
+Linux, Reddit, GitHub et eGPU.io rapportent exactement les mêmes
+symptômes avec des configs différentes :
+
+- Arch Linux BBS — RX 9070XT eGPU reset and system freeze
+  (https://bbs.archlinux.org/viewtopic.php?id=311037)
+- Arch Linux BBS — AMD eGPU over Thunderbolt: crashing like there's no
+  tomorrow (https://bbs.archlinux.org/viewtopic.php?id=311769) — un
+  utilisateur avec une RX 9060 XT, TB4, qui a passé une semaine complète
+  de debug, testé deux cartes différentes (PowerColor puis ASUS), même
+  crash. Un Intel Arc B580 dans le même setup ne crash pas.
+- GitHub ublue-os/bazzite#4164
+  (https://github.com/ublue-os/bazzite/issues/4164) — RX 9070 XT, SMU
+  mismatch, system hang total
+- GitHub ROCm/ROCm#6155 (https://github.com/ROCm/ROCm/issues/6155) —
+  mismatch firmware persiste avec noyaux récents
+
+Le thread Arch Linux le plus complet (#311769
+(https://bbs.archlinux.org/viewtopic.php?id=311769)) montre un
+utilisateur qui a testé tout ce qu'on a testé : DDU, power profiles,
+ReBAR on/off, bypass du dock, deux cartes différentes. Aucun fix trouvé.
+L'Intel Arc B580 dans le même dock marche parfaitement. La conclusion
+est claire : c'est le driver amdgpu + RDNA 4, pas le matériel.
+
+Le workaround SMU mentionné sur Reddit (amdgpu.gfxoff=0) n'existe pas
+sur le noyau 7.2.3. Le bon paramètre serait amdgpu.pg_mask=0, mais il
+casse l'initialisation du VCN. AMD a corrigé le mismatch SMU dans des
+noyaux plus récents pour certaines cartes, mais le support eGPU + RDNA4
++ Thunderbolt n'est visiblement pas dans la matrice de test.
+
+
+Conclusion
+----------
+
+La RX 9070 XT est une carte excellente. Sur un PC fixe avec un lien PCIe
+direct, elle donne tout ce qu'elle promet. Mais en eGPU Thunderbolt 4
+sous Linux, le driver amdgpu n'est pas encore prêt à la gérer
+correctement.
+
+Ce qui m'a coûté le plus de temps n'était pas de trouver les bugs —
+c'était de comprendre que quatre problèmes distincts s'empilaient. On
+pouvait résoudre les trois premiers et croire que c'était bon, puis le
+quatrième surgissait et tout plantait à nouveau. C'est le piège
+classique des bugs qui se masquent mutuellement : tant que le bug #1 tue
+la carte au boot, vous ne voyez jamais le bug #2. Une fois le #1 résolu,
+le #2 apparaît. Une fois le #2 résolu, le #3. Et ainsi de suite.
+
+Le bilan :
+
+- 3 bugs résolus (AER, ReBAR, race condition boot) — le GPU démarre et
+  tient au boot
+- 1 bug non résolu (SMU mismatch) — le GPU crash sous charge soutenue
+- 1 lien PCIe TB4 à 8 Gb/s — normal pour Thunderbolt 4, pas corrigeable
+  par logiciel
+
+Si vous êtes dans ce cas, deux options :
+
+1. Retourner le dock si votre fenêtre de retour n'est pas expirée. Le
+   dock n'est pas le coupable, mais le combo dock + RDNA4 + Linux ne
+   fonctionne pas encore.
+2. Garder la carte pour un futur PC fixe. Le jour où vous la branchez
+   sur un vrai port PCIe, elle marchera parfaitement. Et en attendant,
+   surveillez les mises à jour du noyau Arch — le patch SMU arrivera un
+   jour.
+
+En attendant, mon Framework avec un HX 370 arrive dans six semaines.
+Pour mes LLM en local, il fera le travail sans eGPU. Et si je veux
+vraiment jouer sur cette 9070 XT, la vraie réponse c'est une tour à 400
+€ avec un Ryzen d'entrée de gamme, pas un dock à 300 €.
+
+Merci AMD. Vraiment.

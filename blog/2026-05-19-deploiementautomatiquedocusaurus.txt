@@ -1,0 +1,155 @@
+===================================================
+Adieu le zip et le dézip, j'automatise mon Bastodoc
+===================================================
+
+Le 2026-05-19 / Tags : ci-cd, github-actions, docusaurus, o2switch, devops
+
+
+Depuis que j'ai lancé Bastodoc, à chaque mise à jour je faisais toujours
+le même petit ballet : npm run build, je zippe le dossier build/, je
+glisse le zip dans le gestionnaire de fichiers de cPanel, je lance
+l'antivirus, j'attends qu'il finisse, je dézippe, je supprime l'ancien
+dossier, je copie le nouveau, j'efface le zip. À chaque fois. Pour
+chaque coquille corrigée. Pour chaque nouveau brouillon publié.
+
+Au bout d'un moment, j'en ai eu marre. Surtout que je sais qu'on est en
+2026 et qu'il existe des moyens raisonnables d'automatiser ce genre de
+chose. Voici comment je m'y suis pris, avec les bugs sympas rencontrés
+au passage.
+
+
+
+
+Le repérage
+-----------
+
+Ma première idée a été l'outil Git Version Control intégré au cPanel
+d'o2switch. Sur le papier, ça paraît parfait : tu connectes ton dépôt
+GitHub, le serveur va chercher les nouvelles versions, ça déploie. Sauf
+qu'en pratique, il faut quand même cliquer manuellement sur "Update from
+Remote" puis "Deploy HEAD Commit" à chaque fois. On gagne sur le
+zip/dézip, mais on reste prisonnier de l'interface web. Pas terrible.
+
+J'ai donc cherché plus loin et je suis tombé sur quelque chose que je
+n'attendais pas : o2switch utilise lui-même Docusaurus pour sa propre
+documentation, et leurs workflows GitHub Actions sont publics. Mieux :
+ils ont déployé récemment une API officielle pour gérer la whitelist SSH
+du firewall depuis l'extérieur, ce qui résout pile le problème que je
+redoutais.
+
+C'est donc leur documentation officielle qui a fini par me permettre de
+terminer la mise en place de cette automatisation :
+* o2switch doc - Déploiement ci/cd de docusaurus
+  (https://faq.o2switch.fr/cpanel/outils/exception-parefeu/#exemple-de-d%C3%A9ploiement-de-docusaurus)
+
+>>> INFO : [API expérimentale]
+Pour le moment l'API est en version expérimentale. Actuellement la
+création d'une API donne les même droit que notre utilisateur à cet API.
+Donc soyez prudent en l'utilisant.
+
+
+
+Le vrai problème : le firewall
+------------------------------
+
+Comme tous les hébergements mutualisés sérieux, o2switch bloque par
+défaut tout accès SSH. Pour s'y connecter, il faut autoriser son IP dans
+une liste blanche, limitée à 5 IPs simultanées. Mon IP perso à moi est
+stable, donc OK. Mais un runner GitHub Actions change d'IP à chaque
+exécution. Comment faire ?
+
+L'API d'o2switch permet justement ça. À chaque démarrage du job, le
+runner :
+
+1. Demande à un service externe quelle est son IP publique
+2. Appelle l'API d'o2switch avec un token pour s'ajouter à la whitelist
+3. Fait son boulot (le rsync vers le serveur)
+4. S'auto-retire de la whitelist à la fin
+
+C'est élégant, et c'est gratuit.
+
+
+La construction
+---------------
+
+L'architecture finale ressemble à ça :
+
+
+    --- code ---
+    git push → GitHub Actions → npm build → whitelist IP → rsync SSH → site en ligne
+
+
+Le tout déclenché par un simple git push origin main. Je ne touche plus
+à rien. Pas de zip, pas de FileManager, pas d'antivirus. Et même mieux :
+je peux modifier un article directement dans l'interface web de GitHub
+depuis mon téléphone, ça redéploie tout seul.
+
+Si vous voulez les détails techniques (workflow YAML complet, secrets à
+configurer, fichier .cpanel.yml non utilisé, etc.), j'ai écrit une
+documentation détaillée qui couvre la mise en place pas-à-pas.
+
+
+Les chausse-trapes
+------------------
+
+Évidemment, ce n'est jamais aussi lisse que prévu. Voici ce sur quoi
+j'ai bloqué.
+
+
+- L'outil "Autorisation SSH" buggé
+
+Quand j'ai voulu tester ma première connexion SSH manuelle depuis mon
+poste, j'ai passé pas mal de temps à comprendre pourquoi j'avais un
+timeout. Dans l'interface o2switch, l'outil "Autorisation SSH" propose
+un menu déroulant avec plusieurs ports (22, 8888, et d'autres).
+Naïvement, j'avais choisi 8888 en me disant que ce devait être un port
+plus "moderne" pour SSH.
+
+Spoiler : seul le 22 fonctionne. Le menu propose des ports que le
+firewall ne route pas, c'est cassé. Et au passage, sur 8888 j'avais une
+règle créée uniquement en sortie, donc même en supposant que ça aurait
+pu marcher, ça n'aurait pas marché. J'ai perdu une bonne heure à
+comprendre, en l'occurrence en discutant avec Claude qui m'a sorti la
+doc officielle d'o2switch confirmant que seul le 22 est ouvrable.
+
+
+- La perte du .htaccess
+
+Premier déploiement automatique réussi. Champagne. Je vais voir le
+site... et j'ai une erreur. Le rsync --delete a fait son boulot un peu
+trop bien : il a supprimé mon .htaccess et tout le dossier
+.well-known/acme-challenge utilisé par Let's Encrypt pour renouveler mon
+certificat SSL.
+
+Heureusement, mon .htaccess ne contenait rien de critique (juste une
+page 404 custom que j'avais oublié de garder). Mais ça aurait pu être
+beaucoup plus pénible. Solution : ajouter des --exclude dans la commande
+rsync pour préserver explicitement ces fichiers.
+
+
+- L'IP qui ne se retirait pas
+
+Dernier détail amusant : la commande pour retirer une IP de la whitelist
+ne fonctionnait pas, avec un message d'erreur sec : "Suppression
+impossible, l'autorisation n'existe pas". L'astuce, à peine documentée,
+est qu'il faut préciser la direction (in ou out) dans la requête. L'API
+accepte sans broncher quand on ajoute une règle, mais pour la retirer il
+faut être plus précis.
+
+
+Le résultat
+-----------
+
+Le workflow complet tourne en 2 à 3 minutes par déploiement. Pour
+comparaison, mon ancien zip/dézip me prenait entre 5 et 10 minutes selon
+l'humeur de l'antivirus. Et désormais je peux pousser une correction
+depuis n'importe où, depuis n'importe quel appareil, sans avoir à
+installer Node, sans avoir à me souvenir de la procédure.
+
+C'est typiquement le genre de chose qu'on remet pendant des mois en se
+disant "ouais, faudra que je m'y mette". Et quand on s'y met enfin, on
+se demande pourquoi on a attendu si longtemps.
+
+Si vous êtes chez o2switch et que vous gérez un site statique
+(Docusaurus, Hugo, Astro, peu importe), la procédure est transposable
+telle quelle. La doc technique couvre tout ce qu'il faut.

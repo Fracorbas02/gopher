@@ -1,0 +1,17 @@
+============
+Introduction
+============
+
+
+Le langage C
+------------
+Le C est un langage très puissant et efficace qui apporte une approche
+bas niveau, notamment avec des accès à la mémoire. Cela en fait un
+langage idéal pour les systèmes embarqués.
+
+En plus de ce la il permet une gestion très poussée de la mémoire et de
+son accès qui permet aux développeurs d'optimiser les performances et
+les utilisations de ressource. Connu pour sa simplicité et vitesse, le C
+a été très largement utilisé pour construire presque tout ce que l'on
+connaît : des systèmes d'exploitations aux applications, c'est un
+langage fondamental dans le monde informatique.

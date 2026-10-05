@@ -1,0 +1,75 @@
+!Blog
+
+Mes articles : Linux, réseaux, sécu et homelab.
+
+02026-10-01 - find : au-delà de la recherche de fichiers, le couteau suisse du filesystem	/blog/maitrisercommandefind.txt
+
+02026-09-30 - Bastodoc migre sur mon VPS : rsync, rrsync et les pièges du cloud-init	/blog/migration-deploy-vps-ovh-rsync.txt
+
+02026-09-08 - RX 9070 XT eGPU sur Thunderbolt 4 : ou comment AMD m'a fait perdre trois soirées	/blog/2026-09-08-rx9070xt-egpu-thunderbolt-linux.txt
+
+02026-09-01 - Installer Kali Linux sur Steam Deck sans tout casser — ou l'art de se battre avec Distrobox	/blog/2026-09-01-steam-deck-kali-distrobox.txt
+
+02026-08-31 - Rechercher dans des fichiers : maîtriser grep pour des recherches ciblées	/blog/2026-08-31-maitriser-grep-recherche-fichiers.txt
+
+02026-08-30 - TryHackMe - Windows Powershell	/blog/tryhackmepowershell.txt
+
+02026-08-29 - CVE-2026-73570 : quand Zimbra exécute vos mails rejetés	/blog/zimbreexecutemailrejete.txt
+
+02026-08-03 - Augmentater la taille d'un disque Linux avec LVM	/blog/augmentertailledisquelvm.txt
+
+02026-07-03 - Mistral, l'IA française souveraine	/blog/mistralliasouveraine.txt
+
+02026-05-30 - Installation de FreeIPA dans mon home-lab	/blog/installationfreeipa_homelab.txt
+I  [image] Login Screen FreeIPA	/blog/images/installationfreeipa_homelab/freeipa_loginscreen.png
+
+02026-05-29 - Installation du firewall de mon home-lab	/blog/installationdupare-feu.txt
+
+02026-05-29 - mon Home-Lab	/blog/monhomelab.txt
+
+02026-05-19 - Adieu le zip et le dézip, j'automatise mon Bastodoc	/blog/2026-05-19-deploiementautomatiquedocusaurus.txt
+
+02026-05-16 - Faire tourner Ollama sur GPU AMD sous Arch Linux	/blog/installerollamaarchlinux.txt
+
+02026-05-16 - Mes mésaventures Linux de la semaine	/blog/mesmesaventureslinux.txt
+
+02026-05-12 - Sauvegarder sa base passbolt de manière sécurisée sous docker	/blog/sauvegarde-securise-passbolt-docker.txt
+
+02026-04-26 - Les réseaux Proxmox	/blog/2026-04-26-les-reseaux-proxmox.txt
+I  [image] Créer un bridge Linux	/blog/images/2026-04-26-les-reseaux-proxmox/linuxbridgeproxmox.png
+I  [image] Ajouter un tag VLAN directement à une VM	/blog/images/2026-04-26-les-reseaux-proxmox/vmvlan.png
+I  [image] Créer un Linux VLAN	/blog/images/2026-04-26-les-reseaux-proxmox/linuxvlan.png
+
+02026-04-25 - Liste Flux RSS Ubiquiti	/blog/2026-04-25-flux-rss-ubiquiti.txt
+
+02026-03-06 - Abonnement autopilot Tesla, qu'est-ce que c'est que ça ?	/blog/abonnementautopilottesla.txt
+
+02026-02-05 - Cheatsheet langage Rust	/blog/2026-02-05-rust-cheatsheet.txt
+
+02025-07-07 - Cheatsheet du langage C	/blog/2025-07-08-c-cheatsheet.txt
+
+02025-06-27 - Utiliser markdown avec Docusaurus	/blog/2025-06-27-utilisation-du-markdown.txt
+
+02025-06-25 - Configurer l'authentification biométrique sous Linux	/blog/2025-06-25-configurer-authentification-biometrique.txt
+
+02025-06-24 - monitorer son OS Linux	/blog/2025-06-24-comment-monitorer-son-os-linux.txt
+I  [image] la commande htop	/blog/images/2025-06-24-comment-monitorer-son-os-linux/htop.png
+I  [image] la commande nvtop	/blog/images/2025-06-24-comment-monitorer-son-os-linux/nvtop.png
+I  [image] la commande bpytop	/blog/images/2025-06-24-comment-monitorer-son-os-linux/bpytop.png
+I  [image] system monitor - graphiques	/blog/images/2025-06-24-comment-monitorer-son-os-linux/systemmonitor.png
+I  [image] Mission center	/blog/images/2025-06-24-comment-monitorer-son-os-linux/missioncenter.png
+I  [image] Mission center - les processus	/blog/images/2025-06-24-comment-monitorer-son-os-linux/missioncenter-process.png
+
+02025-06-23 - l'éditeur micro : un éditeur graphique en ligne de commande	/blog/2025-06-23-l-editeur-micro.txt
+I  [image] Les raccourcis de Nano	/blog/images/2025-06-23-l-editeur-micro/nano_raccourcis.png
+
+02025-05-06 - Clair Obscur : Un jeu incroyable	/blog/2025-05-06-clair-obscur-un-jeu-incroyable.txt
+
+02025-04-26 - C'est quoi internet ?	/blog/2025-04-26-c-est-quoi-internet.txt
+
+02025-04-22 - Pourquoi choisir l'Open Source ?	/blog/2025-04-22-pourquoi-utiliser-l-open-source.txt
+
+02025-04-17 - First Blog Post	/blog/2025-04-17-first-blog-post.txt
+
+1Retour au menu principal	/
+.

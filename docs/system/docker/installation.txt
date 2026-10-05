@@ -1,0 +1,247 @@
+======================
+Installation de Docker
+======================
+
+Tags : docker, installation, archlinux, debian, ubuntu, system
+
+
+import Tabs from '@theme/Tabs'; import TabItem from '@theme/TabItem';
+
+
+INSTALLATION DE DOCKER
+======================
+
+Cette page décrit l'installation de Docker Engine et de Docker Compose
+sur deux distributions courantes : Arch Linux et Debian / Ubuntu. La
+procédure couvre l'installation proprement dite, l'activation du service
+et la configuration post-installation permettant d'utiliser Docker sans
+privilèges root.
+
+
+Prérequis
+---------
+
+- Une distribution Linux 64 bits (x86_64 ou arm64).
+- Un noyau Linux récent — au minimum 3.10, en pratique bien plus récent.
+- Un accès administrateur (sudo).
+- Une connexion Internet pour récupérer les paquets et les images.
+
+
+>>> ATTENTION :
+Toute installation antérieure de Docker doit être désinstallée avant de
+procéder, sous peine de conflits de paquets ou de configurations
+résiduelles.
+
+
+
+Installation
+------------
+
+<Tabs groupId="os"> <TabItem value="arch" label="Arch Linux" default>
+
+Sur Arch Linux, Docker est disponible directement dans le dépôt extra :
+
+
+    --- code bash ---
+    sudo pacman -S docker docker-compose
+
+
+Activer et démarrer le service :
+
+
+    --- code bash ---
+    sudo systemctl enable --now docker
+
+
+Vérifier que le daemon répond correctement :
+
+
+    --- code bash ---
+    sudo docker run --rm hello-world
+
+
+
+>>> ASTUCE :
+Le paquet docker-compose d'Arch fournit le plugin Compose, utilisable
+via la syntaxe moderne docker compose (sans tiret). L'ancienne syntaxe
+docker-compose reste disponible mais est dépréciée.
+
+
+</TabItem>
+
+<TabItem value="debian" label="Debian / Ubuntu">
+
+Le dépôt officiel de Docker propose des paquets plus à jour que ceux
+fournis par défaut par Debian ou Ubuntu. La procédure ci-dessous suit la
+méthode recommandée par l'éditeur.
+
+1. Supprimer les éventuelles versions précédentes
+
+
+    --- code bash ---
+    sudo apt remove docker docker-engine docker.io containerd runc
+
+
+2. Installer les dépendances
+
+
+    --- code bash ---
+    sudo apt update
+    sudo apt install -y ca-certificates curl gnupg lsb-release
+
+
+3. Ajouter la clé GPG officielle
+
+
+    --- code bash ---
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg \
+      | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+
+
+>>> NOTE :
+Pour Ubuntu, remplacer debian par ubuntu dans l'URL ci-dessus et dans
+celle du dépôt à l'étape suivante.
+
+
+4. Ajouter le dépôt Docker
+
+
+    --- code bash ---
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+      | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+
+5. Installer Docker Engine et les plugins associés
+
+
+    --- code bash ---
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io \
+                        docker-buildx-plugin docker-compose-plugin
+
+
+6. Vérifier l'installation
+
+
+    --- code bash ---
+    sudo docker run --rm hello-world
+
+
+Le service est généralement démarré et activé automatiquement après
+installation. Si ce n'est pas le cas :
+
+
+    --- code bash ---
+    sudo systemctl enable --now docker
+
+
+</TabItem> </Tabs>
+
+
+Configuration post-installation
+-------------------------------
+
+
+- Utiliser Docker sans sudo
+
+Par défaut, le socket Docker (/var/run/docker.sock) appartient à
+l'utilisateur root et au groupe docker. Ajouter son utilisateur à ce
+groupe permet d'utiliser la CLI sans privilèges élevés :
+
+
+    --- code bash ---
+    sudo usermod -aG docker $USER
+
+
+La modification prend effet à la prochaine session. Pour l'activer
+immédiatement dans le shell courant :
+
+
+    --- code bash ---
+    newgrp docker
+
+
+
+>>> ATTENTION : Implication de sécurité
+Appartenir au groupe docker équivaut à disposer d'un accès root sur
+l'hôte : un utilisateur de ce groupe peut monter n'importe quel
+répertoire de l'hôte dans un conteneur privilégié et obtenir une
+élévation de privilèges. Cette configuration est acceptable sur un poste
+personnel ou une machine de développement, mais pas sur un serveur
+partagé ou en production. Pour ces cas, on préférera Rootless Docker ou
+un accès sudo ciblé.
+
+
+
+- Vérifier l'installation
+
+Une fois la configuration terminée :
+
+
+    --- code bash ---
+    docker version
+    docker info
+    docker compose version
+
+
+docker info affiche notamment le pilote de stockage utilisé, le runtime
+par défaut et la configuration cgroups — autant d'éléments utiles pour
+diagnostiquer rapidement un problème.
+
+
+- Démarrage automatique
+
+Pour s'assurer que Docker démarre à chaque boot :
+
+
+    --- code bash ---
+    sudo systemctl enable docker.service
+    sudo systemctl enable containerd.service
+
+
+
+Désinstallation
+---------------
+
+<Tabs groupId="os"> <TabItem value="arch" label="Arch Linux" default>
+
+
+    --- code bash ---
+    sudo systemctl disable --now docker
+    sudo pacman -Rns docker docker-compose
+
+
+</TabItem>
+
+<TabItem value="debian" label="Debian / Ubuntu">
+
+
+    --- code bash ---
+    sudo systemctl disable --now docker
+    sudo apt purge docker-ce docker-ce-cli containerd.io \
+                   docker-buildx-plugin docker-compose-plugin
+    sudo apt autoremove --purge
+
+
+</TabItem> </Tabs>
+
+Les données persistantes (images, conteneurs, volumes, réseaux) ne sont
+pas supprimées par la désinstallation des paquets. Pour les effacer :
+
+
+    --- code bash ---
+    sudo rm -rf /var/lib/docker /var/lib/containerd
+
+
+
+Et ensuite ?
+------------
+
+L'installation étant terminée, la prochaine étape consiste à se
+familiariser avec les commandes fondamentales du cycle de vie d'un
+conteneur, puis avec la construction d'images via Dockerfile.

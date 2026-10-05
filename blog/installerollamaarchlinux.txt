@@ -1,0 +1,327 @@
+================================================
+Faire tourner Ollama sur GPU AMD sous Arch Linux
+================================================
+
+Le 2026-05-16 / Tags : informatique, open-source, system, Linux, IA
+
+
+Après une réinstallation fraîche d'Arch, je relance Ollama pour discuter
+avec mon LLM local préféré… et le constat est sans appel : 100% CPU, 0%
+GPU. Pourtant, j'ai sous le capot une Radeon RX 6800M (12 Go de VRAM,
+Navi 22) qui ne demande qu'à mouliner des matrices. Petite session de
+débogage qui m'a permis de comprendre un peu mieux les coulisses des
+backends de calcul GPU sous Linux.
+
+
+
+
+Le symptôme
+-----------
+
+Au lancement d'ollama serve, les lignes intéressantes du log sont les
+suivantes :
+
+
+    --- code ---
+    inference compute" id=cpu library=cpu ... total="30.5 GiB" available="13.2 GiB"
+    "vram-based default context" total_vram="0 B" default_num_ctx=4096
+
+
+Traduction : Ollama n'a découvert que la bibliothèque cpu, et annonce 0
+octet de VRAM disponible. Il ne voit aucun GPU compatible compute, alors
+que côté graphique tout marche très bien (Wayland tourne, les jeux
+Vulkan se lancent, etc.). Ce divergence "le GPU rend de l'image mais
+Ollama ne le voit pas" est en fait un grand classique, et il faut
+comprendre pourquoi pour le résoudre proprement.
+
+
+GPU : le rendu graphique et le calcul, ce sont deux mondes
+----------------------------------------------------------
+
+Quand un GPU est attaché à un système Linux, deux stacks logicielles
+complètement distinctes s'empilent au-dessus du même hardware :
+
+Côté rendu graphique (ce qui affiche les pixels)
+- Le module kernel amdgpu (le driver Linux open-source pour les GPU AMD
+  modernes).
+- Mesa, qui implémente OpenGL et Vulkan côté rendu (RADV pour Vulkan
+  AMD, RadeonSI pour OpenGL).
+- C'est ce qui fait tourner ton compositor, tes jeux, ton navigateur
+  accéléré, etc.
+
+Côté calcul (ce qui fait tourner un LLM ou un entraînement ML)
+- Le même module kernel amdgpu (heureusement, il n'y en a qu'un).
+- Mais une stack logicielle séparée pour le compute : ROCm/HIP
+  (l'équivalent AMD de CUDA), ou bien Vulkan compute (l'API graphique
+  détournée pour faire du calcul générique).
+
+C'est crucial : avoir Mesa + RADV installés et fonctionnels (donc des
+jeux qui tournent) ne suffit pas pour qu'un soft comme Ollama, PyTorch
+ou llama.cpp puisse utiliser le GPU. Il faut en plus une stack compute,
+et c'est exactement ce qui me manquait.
+
+
+ROCm ou Vulkan : choisir son backend
+------------------------------------
+
+Pour le compute AMD, deux options réelles existent aujourd'hui :
+
+| Backend | Origine | Avantages | Limitations |
+|---|---|---|---|
+| **ROCm / HIP** | Stack officielle AMD, équivalent de CUDA | Performance optimale, kernels spécifiquement optimisés | Liste de GPU supportés limitée, paquets lourds, parfois besoin de hacks (`HSA_OVERRIDE_GFX_VERSION`) |
+| **Vulkan compute** | API graphique standard, support compute ajouté à llama.cpp puis Ollama | Très large compatibilité, paquets légers, déjà présent si tu joues | Marqué expérimental dans Ollama, perfs parfois 5-10% en deçà selon les modèles |
+
+Mon GPU étant une Radeon RX 6800M (LLVM target gfx1031), il n'est pas
+dans la matrice officielle ROCm. La solution côté ROCm consisterait à le
+faire passer pour un gfx1030 (RX 6800/6900 desktop) via
+HSA_OVERRIDE_GFX_VERSION=10.3.0. Ça marche en pratique, mais c'est un
+hack documenté qu'il faut maintenir.
+
+Côté Vulkan, j'ai déjà toute la stack installée pour le jeu
+(vulkan-radeon, vulkan-icd-loader). Aucun override à gérer. C'est la
+voie la plus simple, c'est celle que j'ai choisie.
+
+
+>>> INFO : Performance ROCm vs Vulkan
+On pourrait croire que ROCm écrase Vulkan en perf, mais ce n'est pas si
+tranché. Des benchmarks récents (Radeon 890M, Ollama 0.13.5) montrent
+Vulkan devant ROCm de quelques pourcents sur certains modèles. Pour un
+usage personnel "j'ai besoin que mon LLM tourne vite", Vulkan est
+largement suffisant.
+
+
+
+Le piège du paquet Arch
+-----------------------
+
+C'est LE point qui m'a fait perdre le plus de temps. Sur Arch, le dépôt
+extra propose plusieurs paquets construits depuis le même code source
+d'Ollama :
+
+| Paquet | Backend(s) compilé(s) dans le binaire |
+|---|---|
+| `ollama` | **CPU uniquement** |
+| `ollama-rocm` | ROCm/HIP (AMD) |
+| `ollama-cuda` | CUDA (NVIDIA) |
+| `ollama-vulkan` | Vulkan |
+
+Cette séparation date d'octobre 2025, quand Ollama 0.12.6 a introduit le
+backend Vulkan upstream. Avant, il n'y avait que ollama + ollama-rocm +
+ollama-cuda.
+
+Le piège, c'est que si tu fais un naïf sudo pacman -S ollama, tu
+récupères le binaire CPU-only. Et pire, ce binaire reconnaît quand même
+les variables d'environnement comme OLLAMA_VULKAN et
+ROCR_VISIBLE_DEVICES (le code Go les lit toujours pour configurer le
+runtime). Donc tu peux légitimement croire que tu as bien configuré ton
+environnement, voir les variables apparaître dans les logs… sans que
+rien ne se passe, parce que les bibliothèques compute ne sont pas
+linkées dans ce binaire.
+
+C'est exactement ce qui m'arrivait :
+
+    --- code ---
+    OLLAMA_VULKAN:false           # même si j'exporte =1, ça reste false
+    ROCR_VISIBLE_DEVICES:         # paramètre lu mais inerte
+
+
+La solution se résume à un seul changement de paquet :
+
+
+    --- code bash ---
+    sudo pacman -S ollama-vulkan
+
+
+Pacman propose le remplacement automatique de ollama par ollama-vulkan
+(ils sont déclarés en conflit mutuel dans les PKGBUILDs). Les modèles
+déjà téléchargés dans /var/lib/ollama (ou ~/.ollama/models selon ton
+setup) ne sont pas touchés — c'est de la donnée, séparée du binaire.
+
+
+La configuration via drop-in systemd
+------------------------------------
+
+Sur Arch, ollama s'installe avec une unité systemd, donc on lance le
+service via systemd plutôt qu'en ollama serve à la main. Pour ajouter
+des variables d'environnement à un service système, on n'édite pas
+l'unité d'origine (elle serait écrasée à chaque mise à jour du paquet).
+On utilise un drop-in :
+
+
+    --- code bash ---
+    sudo systemctl edit ollama.service
+
+
+Cette commande ouvre un éditeur sur un fichier vide, qui sera enregistré
+sous /etc/systemd/system/ollama.service.d/override.conf. On y met :
+
+
+    --- code ini ---
+    [Service]
+    Environment="OLLAMA_VULKAN=1"
+
+
+Puis on recharge et on redémarre :
+
+
+    --- code bash ---
+    sudo systemctl daemon-reload
+    sudo systemctl restart ollama.service
+
+
+
+>>> ASTUCE : Pourquoi un drop-in et pas une édition directe ?
+Le fichier /usr/lib/systemd/system/ollama.service appartient au paquet
+ollama-vulkan. Toute modification y serait perdue à la prochaine mise à
+jour. Le dossier /etc/systemd/system/<unit>.service.d/ est en revanche
+ta zone : systemd y cherche automatiquement les drop-ins après avoir
+chargé l'unité principale, et les appliques par-dessus. C'est la méthode
+propre, supportée, et persistante.
+
+
+
+Le piège du dual-GPU
+--------------------
+
+Au redémarrage du service, les logs montrent enfin la détection GPU.
+Mais dans mon cas, deux devices apparaissent :
+
+
+    --- code ---
+    library=Vulkan name=Vulkan0 description="AMD Radeon RX 6800M (RADV NAVI22)"
+        pci_id=0000:03:00.0 type=discrete total="12.0 GiB"
+    
+    library=Vulkan name=Vulkan1 description="AMD Radeon 680M (RADV REMBRANDT)"
+        pci_id=0000:37:00.0 type=iGPU total="15.8 GiB"
+
+
+Le second device, c'est l'iGPU Radeon 680M intégré à mon Ryzen 6000. Et
+là il y a un piège majeur : Ollama additionne les deux mémoires
+(total_vram="27.8 GiB") et calcule un contexte par défaut généreux en
+supposant qu'il peut splitter un modèle sur les deux GPU. Sauf que :
+
+- L'iGPU n'a pas de VRAM physique : ses "15.8 GiB" sont une fenêtre
+  allouée dynamiquement sur la RAM système.
+- La bande passante DDR5 dual-channel tourne autour de 85 Go/s, contre
+  ~448 Go/s pour la GDDR6 de la dGPU.
+- Splitter un modèle entre les deux fait que la dGPU attend
+  systématiquement l'iGPU à chaque batch.
+
+Bilan : un seul GPU lent peut diviser par 3 ou 4 la vitesse d'inférence
+du tandem. On veut donc forcer Ollama à n'utiliser que la dGPU.
+
+La variable qui fait le filtrage côté Vulkan s'appelle
+GGML_VK_VISIBLE_DEVICES (sémantique identique à CUDA_VISIBLE_DEVICES
+côté NVIDIA) :
+
+
+    --- code bash ---
+    sudo systemctl edit ollama.service
+
+
+
+    --- code ini ---
+    [Service]
+    Environment="OLLAMA_VULKAN=1"
+    Environment="GGML_VK_VISIBLE_DEVICES=0"
+
+
+Le 0 ici correspond à l'index Vulkan0 dans les logs, c'est-à-dire la
+dGPU. Pour les autres backends, les équivalents existent :
+ROCR_VISIBLE_DEVICES pour ROCm, CUDA_VISIBLE_DEVICES pour NVIDIA.
+
+
+>>> ATTENTION : Vérifier l'index avant de filtrer
+L'ordre d'énumération Vulkan0 / Vulkan1 n'est pas garanti d'un boot à
+l'autre, surtout après une mise à jour du kernel ou un changement de
+hardware. Vérifie toujours dans les logs avant de positionner la
+variable.
+
+
+
+Vérification finale
+-------------------
+
+Après le restart, les logs doivent montrer :
+
+
+    --- code ---
+    inference compute id=00000000-0300-0000-0000-000000000000 library=Vulkan
+        name=Vulkan0 description="AMD Radeon RX 6800M (RADV NAVI22)"
+        total="12.0 GiB" available="11.X GiB"
+    "vram-based default context" total_vram="12.0 GiB" default_num_ctx=...
+
+
+Une seule ligne inference compute, 12 GiB de VRAM annoncés, l'iGPU
+n'apparaît plus. À ce stade, en chargeant un modèle :
+
+
+    --- code bash ---
+    ollama ps
+
+
+La colonne PROCESSOR doit afficher 100% GPU. Si ce n'est pas le cas
+(offloading partiel CPU/GPU), c'est que le modèle ne rentre pas en VRAM
+et qu'il faut envisager une quantization plus agressive ou un modèle
+plus petit.
+
+
+Bonus : lire journalctl sans s'arracher les cheveux
+---------------------------------------------------
+
+La ligne server config d'Ollama est large comme un boulevard (toute la
+map des variables d'env sur une seule ligne), ce qui rend la lecture
+pénible. Quelques options qui aident :
+
+
+    --- code bash ---
+    # Sortie sans préfixes timestamp + hostname + unité
+    journalctl -u ollama.service -o cat --no-pager
+    
+    # Limiter au boot courant uniquement
+    journalctl -u ollama.service -b
+    
+    # Suivre en temps réel
+    journalctl -u ollama.service -f
+    
+    # Filtrer la ligne pénible
+    journalctl -u ollama.service -b --no-pager | grep -v 'server config'
+    
+    # Combo confortable
+    journalctl -u ollama.service -b --no-hostname -o short-iso
+
+
+Quelques rappels rapides sur les flags :
+- -u <unit> : filtre sur une unité systemd précise.
+- -b : --boot, ne montre que les logs du boot courant. -b -1 pour le
+  boot précédent.
+- -o <format> : format de sortie. cat enlève tous les préfixes,
+  short-iso met un timestamp ISO compact.
+- --no-pager : court-circuite less, utile pour piper la sortie.
+- -f (follow) et -e (end) : équivalents de tail -f et tail -n sur les
+  fichiers de log classiques.
+
+
+Conclusion
+----------
+
+Ce qui m'a coûté le plus de temps n'était ni la commande à taper ni la
+conf à écrire — c'était de comprendre que le binaire ollama du dépôt
+Arch est CPU-only par design, et qu'il fallait spécifiquement choisir
+ollama-vulkan ou ollama-rocm. Les variables d'environnement comme
+OLLAMA_VULKAN=1 n'activent rien si le runtime correspondant n'est pas
+linké dans le binaire.
+
+Au final, le diagnostic d'un "GPU non détecté" sous Linux passe par
+trois questions, dans cet ordre :
+
+1. Le module kernel est-il chargé ? (lspci -k, vérifier Kernel driver in
+   use: amdgpu ou équivalent NVIDIA)
+2. La stack compute (Vulkan/ROCm/CUDA) est-elle installée et
+   fonctionnelle ? (vulkaninfo --summary, rocminfo, nvidia-smi)
+3. Le binaire de l'application est-il compilé avec ce backend ? (à
+   vérifier paquet par paquet — c'est ici que le piège se cache souvent)
+
+La couche 1 est rarement le problème sur du matériel moderne. La couche
+2 est ce qu'on suspecte en premier mais souvent OK. La couche 3 est
+celle qu'on oublie, et qui m'a fait perdre une bonne soirée.

@@ -1,0 +1,12 @@
+===============
+First Blog Post
+===============
+
+Le 2025-04-17 / Tags : informatique
+
+
+Le premier article d'une longue lignée
+--------------------------------------
+
+On va pouvoir parler de tout ce qui se passe dans le monde de
+l'informatique et de la sécurité.

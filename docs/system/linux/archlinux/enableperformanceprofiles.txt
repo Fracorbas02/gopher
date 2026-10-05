@@ -1,0 +1,40 @@
+=========================
+EnablePerformanceProfiles
+=========================
+
+
+ACTIVER LES PROFILS DE PERFORMANCE
+==================================
+
+Il faut savoir que les profils de performances sont géré par le BIOS, si
+ce dernier ne les permets pas, dans ce cas, il ne sera pas possible
+d'activer ce paramètre.
+| il est aujourd'hui assez rare que les BIOS des ordinateurs ne
+| permettent pas ceci
+
+Lorsque l'on utilise Gnome, cela est géré par power-profiles-daemon
+(cela permet de l'avoir directement sur l'interface graphique).
+
+Il faut donc que ce daemon soit installé et fonctionnel pour avoir les
+profils de performance.
+
+Pour l'installer :
+
+
+    --- code ---
+    sudo pacman -Syu
+    sudo pacman -S power-profiles-daemon
+
+
+Après avoir installé le daemon, il faut bien l'activer afin que ce
+dernier soit bien démarré à chaque fois que l'on démarre notre machine :
+
+
+    --- code ---
+    sudo systemctl enable --now power-profiles-daemon
+
+
+Une fois cela fait, on redémarre notre PC et pouf, on a les profils de
+performance qui apparaissent dans l'onglet en haut à droite : <img
+src="/img/system/linux/Arch/EnablePowerModes.png"
+alt="ArchEnablePowerModes.png" width="410" height="395"/>

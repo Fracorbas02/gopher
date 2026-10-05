@@ -1,0 +1,57 @@
+========================================================
+Abonnement autopilot Tesla, qu'est-ce que c'est que ça ?
+========================================================
+
+Le 2026-03-06 / Tags : tesla
+
+
+Avec les récentes déclarations de Tesla, les différentes offres de
+pilote autonome sont désormais passée en une offre unique sous forme
+d'abonnement. N'ayant aucun intérêt de débourser 3600€ dans un prix
+fixe, c'est désormais à 100€ que cet abonnement se présente.
+
+Etant curieu de voir ce qu'apporte cet abonnement je l'ai donc pris, et
+quelle fut ma surprise de ne voir absolument aucune amélioration sur le
+comportement de la voiture au niveau de l'autopilot
+
+
+
+Premièrement, aucune mise à jour n'est nécessaire sur la voiture, c'est
+un plus, on a pas besoin de la connecter au wifi attendre une heure le
+temps que la fonctionnalité apparaisse.
+
+Mais bon, mis à part ça concrètement, j'ai voulu tester sur un trajet
+national : aucun changement de comportement. Les rond-points ne sont pas
+pris, les virages sérés ne sont pas pris non plus, els hésitations dasn
+les virages sont présentes et surtout aucune amélioration dans la
+gestion des bouchons (acoup à l'accélération et au freinage).
+
+Donc, à juste titre, je me demande où sont ces fameuses améliorations.
+C'est en relisant méticuleusement le texte d'avertissement lorsque l'on
+autorise cette fonctionnalité que l'on comprend le souci. Il est mention
+une fois "d'autoroute". Alors je teste, je lance un trajet avec des
+autoroute et la fonctionnalité apparaît... Voilà le couac, il est là,
+donc toute la conduite autonomme ne fonctionne que sur des portions
+autoroutières. J'ai testé plein de trajet c'est vraiment ça qui change
+le fait que la voiture met ou non le paramètre.
+
+j'ai également testé la sortie intelligente ; trois fois, aucune n'a
+fonctionnée. J'étais sur une voie publique, mais sur un parking, c'est
+potentiellement ça qui a fait que la voiture refusait.
+
+Enfin bref, c'est tout de même décevant, je pensais que ça allaitr
+changer le comportement de la voiture sur des routes nationales, mais
+absolument pas ! Dans ce cas à quoi bon laisser la possibilité à
+l'utilisateur d'utiliser les fonctionnalitées de maintien dans la voie
+sur nationale si c'est pour ne pas permettre l'utilisation de la
+fonction avancée ?
+
+J'attendais beacoup de cet achat, que ça soit sur la gestion des
+bouchons ou la conduite de manière générale qui serait d'une manière ou
+d'une autre plus fluide, mais que nani... Aucune amélioration notable
+(malgré une fonctionnalité de reconnaissance des feux et des stops pour
+s'arrêter, ça n'a aucun sens) sur nationale. Je ne manquerais pas
+d'aller m'amuser sur autoroute, car tout semble se passer sur ces
+portions, mais bon... si c'est pour payer 100€ d'abonnement et 250 de
+péages pour utiliser une fonctionnalité qui ne fait pas grand chose...
+il y a de quoi râler.

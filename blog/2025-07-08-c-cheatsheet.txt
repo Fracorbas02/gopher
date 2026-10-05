@@ -1,0 +1,908 @@
+=======================
+Cheatsheet du langage C
+=======================
+
+Le 2025-07-07 / Tags : cheatsheet, informatique
+
+
+>>> ATTENTION : [Information]
+Article toujours en cours de rédaction
+
+J'ai eu envie de me remettre au C après que j'ai eu l'envie de monter
+plusieurs projets assez important (on verra ça plus tard). Donc je me
+suis dis que j'allais mettre à disposition sous forme de fiche de triche
+les éléments que je suis en train de voir sur le langage C.
+
+
+>>> ASTUCE : [Information]
+J'ai récupéré la plupart des informations sur le site de coddy
+(https://coddy.tech). Un site pour apprendre à coder pas à pas avec
+plein de challenge. N'hésitez pas à y faire un tour, ça peut toujours
+aider
+
+
+
+Les variables
+-------------
+
+### Les types de donnée En C, chaque donnée de votre programme a un type
+spécifique. Les types de données définissent le type de données qu'une
+variable peut contenir et la quantité de mémoire dont elle a besoin.
+
+|Type de donnée|Signification|Taille (en octet)|plage de valeur|
+|-|-|-|-|
+|`char`|caractère|1|-128 à 127|
+|`unsigned char`|caractère non signé|1|0 à 255|
+|`short int`|Entier court|2|-32768 à 32 767|
+|`unsigned short int`|Entier court non signé|2|0 à 65 535|
+|`int`|Entier|2 (sur CPU 16 bit) <br />4 (sur CPU 32 bit)|-32 768 à 32 767<br />-2 147 483 648 à 2 147 483 647|
+|`unsigned int`|Entier non signé|2 (sur CPU 16 bit) <br />4 (sur CPU 32 bit)|0 à 65 535<br />0 à 4 294 967 295|
+|`long int`|Entier long|4|-2 147 483 648 à 2 147 483 647|
+|`unsigned long int`|Entier long non signé|4|0 à 4 294 967 295|
+|`float`|flottant (réel)|4|3.4\*10⁻³⁸ à 3.4\*10³⁸|
+|`double`|flottant double|8|1.7\*10⁻³⁰⁸ à 1.7`*10³⁰⁸|
+|`long double`|flottant double long|10|3.4\*10⁻⁴⁹³² à 3.4\*10⁴⁹³²|
+|`_Bool`|booléen|||
+|`T*`|pointeur|||
+|`T[]`|tableau|||
+|`void`|vide|||
+
+
+
+    --- code C title="les types de données en C" ---
+    int number = 42;        // un nombre entier
+    float price = 10.5f;    // un nombre à virgule flottante
+    double pi = 3.14159;    // Double précision en virgule flottante
+    char grade = 'A';       // un seul caractère
+    // Etc.
+
+
+
+- Conversion de type
+La conversion de type en C nous permet de convertir une variable d'un
+type à un autre. C'est utile lorsque l'on doit effectuer des opérations
+entre différents types de donnée.
+
+Il existe deux types principaux de conversion :
+* conversion implicite (automatique)
+* conversion explicite (manuelle)
+
+
+    --- code C title="Exemple de conversion implicite" ---
+    int num = 10;
+    double decimal_num;
+    // Conversion d'entier vers double
+    decimal_num = num;
+
+
+>>> ASTUCE : [rappel]
+Cette conversion fonctionne car un double peut stocker toutes les
+valeurs possible d'un int sans perdre aucune donnée. Chemins de
+conversion implicite :
+* char → int → long → float → double
+
+
+
+    --- code C title="Exemple de conversion explicite" ---
+    float price = 45.95;
+    int rounded_price = (int) price;
+    // Le prix deviendra alors 45
+    
+    char letter = 'A';
+    int ascii_value = (int) letter;
+    // ascii_value sera égal à 65
+
+
+
+
+
+Les opérateurs
+--------------
+
+
+- Opérateurs d'affectation
+Les opérateurs d'affectation en C sont utilisés pour attribuer des
+valeurs aux variables. L'opérateur d'affectation le plus élémentaire est
+le signe égal =. Toutefois, le langage C propose également des
+opérateurs d'affectation composés qui combinent des opérations
+arithmétiques avec l'affectation.
+
+Les opérateurs les plus courants :
+* = : affectation simple
+* += : Ajoute puis affecte
+* -= : Soustrait et affecte
+* /= : divise et affecte
+* %= : effectue un modulo et affecte
+
+
+    --- code C title="Exemple d'affectation" ---
+    int a = 5;
+    a += 3; // a contient maintenant 8
+
+
+
+- Opérateurs relationnels
+
+Ces opérateurs sont utilisés pour comparer deux opérandes.
+
+Il est parfois nécessaires de vérifier si un opérande est plus grand /
+plus petit qu'un autre opérande. Le tableau suivant présente les
+opérateurs de comparaison possibles :
+|Opérateur|signification|Exemple|
+|--------------------|--------------------|--------------------|
+|`==`|égal| `1 == 2` retourne 0 (false)|
+|`!=`|Pas égal|`1 != 2` retourne 1 (true)|
+|`>`|Plus grand que|`1 > 2` retourne 0 (false)|
+|`<`|Plus petit que|`1 < 2` retourne 1 (true)|
+|`>=`|Plus grand ou égal|`1 >= 2` retourne 0 (false)|
+|`<=`|Plus petit ou égal|`1 <= 2` retourne 1 (true)|
+
+Les opérateurs de comparaisons retournent 1 si la comparaison est vraie
+et 0 si c'est faux. Par exemple :
+
+    --- code C title="Exemple d'opérateurs de comparaison" ---
+    int var1 = 13;
+    int var2 = 12;
+    int var3 = var1 != var2;
+
+
+
+- Opérateurs logique
+Les opérateurs logique sont utilisés pour vérifier les combinaisons de
+comparaisons qui renvoient 1 (true) ou 0 (false)
+
+Par exemple, l'instruction suivante contient deux comparaisons : 5 est
+plus grand que 3 et plus petit que 6 ?
+|Opérateur|Signification|Exemple|
+|--------------------|--------------------|--------------------|
+|`&&`|ET - `1` si **tous** les opérandes sont `1`|`a && b`|
+|`\|\|`|OU - `1` si **l'un** des opérande est `1`|`a \|\| b`|
+|`!`|NON - `1` si l'opérande est `0` |`!a`|
+
+Exemples :
+
+    --- code C title="5 est plus grand que 3 et 1 est égal à 1" ---
+    int b1 = (5 > 3) && (1 == 1); // Contient 1 (true)
+
+
+
+    --- code C title="5 n'est pas égal à 4 ou 5 égal à 2" ---
+    int b2 = !(5 == 4) || (5 == 2); // Contient 1 (true)
+
+
+Les opérateurs logiques ont des tables spéciales que l'on nomme "Table
+de vérité" qui indiquent ce que la combinaison des opérateurs logiques
+produit.
+
+Table de vérité pour l'opérateur ET :
+|a|b|a `&&` b|
+|--------------------|--------------------|--------------------|
+|0|0|0|
+|0|1|0|
+|1|0|0|
+|1|1|1|
+
+La seule manière d'obtenir 1 pour l'opérateur ET est si à la fois a et b
+sont 1.
+
+Table de vérité pour l'opérateur OU
+
+|a|b|a `\|\|` b|
+|-|-|-|
+|0|0|0|
+|1|0|1|
+|1|1|1|
+
+Dans ce cas, pour avoir 1, il faut que soit a ou b soit 1.
+
+Table de vérité pour l'opérateur NOT :
+|a|!a|
+|-|-|
+|0|1|
+|1|0|
+
+Ici la valeur de a est inversée.
+
+
+Lors de la vérification de plusieurs conditions, le programme s'arrête
+dès qu'il connaît la réponse finale. C'est ce que l'on appelle
+l'évaluation en court-circuit.
+
+
+    --- code C title="Exemple" ---
+    int x = 0;
+    int y = 5;
+    int result = (x != 0) && (y / x > 2);
+
+
+Ici x égal 0, donc l'évaluation de la condition y / x > 2 n'aura pas
+leu. Et si on inversait l'ordre :
+
+    --- code C ---
+    int result = (y / x > 2) && (x != 0);
+
+Dans ce cas, on va avoir une erreur car y sera divisé par 0, ce qui est
+impossible. Il est donc une bonne pratique de réfléchir aux opérations
+logiques pour avoir la manière la plus logique et effective sans avoir
+d'erreur.
+
+On peut utiliser cette technique pour optimiser l'évaluation des
+opérations logique.
+
+    --- code C title="Exemple" ---
+    int a = 0;
+    int b = 2;
+    int c = 3;
+    int d = 5;
+    int result = (a > 0 && b < 2) || (c < -5 && d < 10);
+
+Ici b < 2 et d < 10 ne vont pas être évaluées car a > 0 et c < -5 sont
+toutes les deux false.
+
+
+Flux de contrôle
+----------------
+
+
+- Déclaration if
+
+la déclaration if est une structure fondamentale du flux de contrôle en
+C qui permet à votre programme de prendre des décisions.
+
+Une instruction if exécute un bloc de code uniquement si une condition
+spécifiée est vraie.
+
+
+    --- code C title="Structure basique d'un if" ---
+    if (condition) {
+        // Code to execute if condition is true
+    }
+
+
+
+    --- code C title="Exemple simple" ---
+    int age = 20;
+    
+    if (age >= 18) {
+        printf("You are an adult.\n");
+    }
+
+
+
+- if - else
+
+L'instruction if-else permet au programme de prendre des décisions
+basées sur des conditions. Si une condition est vraie, un bloc de code
+s'exécute ; dans le cas contraire, un autre est exécuté.
+
+
+    --- code C title="Exemple de if-else" ---
+    int age = 17;
+    if (age >= 18) {
+        printf("You are an adult.\n");
+    } else {
+        printf("You are a minor.\n");
+    }
+
+
+Ici, le résultat sera donc un mineur vu que le bloc else a été exécuté.
+
+
+- else-if
+L'instruction else-if permet de vérifier plusieurs conditions en
+séquence. Lorsque la première condition if échoue, elle passe alors à la
+condition else-if suivante, et ainsi de suite.
+
+
+    --- code C title="Exemple de else-if" ---
+    if (grade >= 90) {
+        printf("A grade\n");
+    } else if (grade >= 80) {
+        printf("B grade\n");
+    } else if (grade >= 70) {
+        printf("C grade\n");
+    } else {
+        printf("Failed\n");
+    }
+
+
+
+- Switch case
+L'instruction switch est un décideur à plusieurs voies qui teste si une
+expression correspond à l'une de plusieurs valeurs entières constantes,
+et qui se branche en conséquence.
+
+
+    --- code C title="Exemple de switch case" ---
+    int day = 3;
+    switch (day) {
+        case 1:
+            printf("Monday\n");
+            break;
+        case 2:
+            printf("Tuesday\n");
+            break;
+        case 3:
+            printf("Wednesday\n");
+            break;
+        default:
+            printf("Other day\n");
+    }
+
+
+
+- Opérateur conditionnel ternaire
+L'opérateur conditionnel ternaire est une manière plus rapide pour
+déclarer un if-else en une seule ligne.
+
+    --- code C title="La syntaxe" ---
+    condition ? value_if_true : value_if_false;
+
+
+
+    --- code C title="Condition traditionnelle" ---
+    int max;
+    if (a > b) {
+        max = a;
+    } else {
+        max = b;
+    }
+
+
+
+    --- code C title="Cette condition mais en version ternaire" ---
+    int max = (a > b) ? a : b;
+
+
+Ici, si la condition est vraie, a est retourné, si elle est fausse, b
+est retourné.
+
+On peut également imbriqué cet opérateur, mais rendre le code moins
+lisible :
+
+    --- code C title="Bonne chance : )" ---
+    int x = (a > b) ? ((a > c) ? a : c) : ((b > c) ? b : c);
+
+
+
+- if-else imbriqué
+
+On peut imbriquer des instructions if-else les unes dans les autres.
+Cela nous permet de créer des structures décisionnelles hiérarchiques.
+
+
+    --- code C title="if imbriqué" ---
+    if (condition1) {
+        if (condition2) {
+            if (condition3) {
+                // if condition1, condition2 and condition3 are true
+            }
+        }
+    }
+
+
+
+
+Input & Output
+--------------
+
+
+- <span id="specificateurFormat">spécificateurs de format</span>
+
+En C, la fonction printf() est utilisée écrire une sortie formatée dans
+la console. Elle fait partie de la bibliothèque standard input/output
+<stdio.h>
+
+La chaîne de format peut contenir :
+* du texte brut, qui est imprimé tel quel
+* des spécificateurs de format, qui commencent par % et sont remplacés
+  par les valeurs des arguments.
+
+Les spécificateurs de format :
+* %d ou %i pour les entiers (int)
+* %f pour les float ou double
+* %e ou %E pour les notations scientifiques
+* %lf pour les double
+* %Lf pour les long double
+* %o entier octal
+* %u entier court non signé
+* %ld entier décimal long
+* %x ou %X entier en hexadécimal
+* %p imprime l'adresse mémoire sous forme hexadécimale
+* %c pour les caractères (char)
+* %s pour les chaînes de caractères (string)
+
+On peut également ajouter du contrôle dans la largeur et la précision de
+la sortie :
+* %5d : un entier de largeur 5
+* %7.2f : un float de largeur 7 avec 2 places après la virgule
+* %-10s : un string aligné à gauche avec une largeur de 10
+
+
+    --- code C title="Exemple" ---
+    int age = 25;
+    printf("I am %d years old.\n", age); 
+    /*
+    \n permet de faire un retour à la ligne
+    */
+
+
+
+- la fonction scanf()
+
+En langage C, la fonction scanf() est utilisée pour lire une entrée
+formatée de l'utilisateur. C'est une fonction qui fait partie de
+<stdio.h>.
+
+    --- code C title="syntaxe basique" ---
+    scanf("Chaîne de format", &variable1, &variable2, ...);
+    // ATTENTION              ^           ^
+
+
+La chaîne de format contient des spécificateurs de format qui
+correspondent aux type de variable que l'on lit. On retrouve ceux que
+j'ai énoncé au dessus.
+
+
+>>> ASTUCE : [rappel]
+Il y a un & avant de définit les variables. La fonction scanf a besoin
+de l'adresse mémoire des variable pour écrire les données que
+l'utilisateur renseigne.
+
+
+    --- code C title="Exemple" ---
+    int age;
+    scanf("%d", &age);
+
+
+
+>>> ATTENTION : [problème de tampon]
+Lorsque l'on effectue plusieurs scanf à la suite, il est possible que
+des sauts de ligne restent dans le tampon d'entrée.
+
+    --- code C title="Exemple" ---
+    #include <stdio.h>
+    
+    int main() {
+    	int age;
+    	float height;
+    	char initial;
+    	
+    	scanf("%d", &age);
+    	scanf("%f", &height);
+    	scanf("%c", &initial);
+    
+    	printf("Age: %d\nHeight: %.2f m\nInitial: %c", age, height, initial);
+    	return 0;
+    }
+
+Si vous essayez de rentrer la seconde valeur, cela va vous donner le
+résultat final malgré qu'il y ait un troisième scanf présent. Pour
+résoudre ce problème il faut ajouter un espace avant le spécificateur de
+format :
+
+    --- code C title="ajout d'un espace" ---
+    scanf(" %c", &initial);
+
+Ceci permet d'indiquer à scanf d'ignorer les espaces blancs (comme \n)
+jusqu'à ce qu'un caractère soit lu.
+
+
+
+- Validation de l'entrée
+Lorsque l'on accepte des données d'un utilisateur, il est important que
+l'on vérifie que cette entrée est bonne avant de l'utiliser dans notre
+programme.
+
+Pour cela, on peut effectuer deux types de validation :
+* validation de la saisie au niveau du type
+* validation de la saisie au niveau du domaine de valeur attendu
+
+
+    --- code C title="validation du type" ---
+    int number;
+    int result = scanf("%d", &number);
+    if (result == 1) {
+        // L'entrée est bien un entier
+    } else {
+        // L'utilisateur a saisi une valeur invalide (ex. du texte)
+    }
+
+Ici, scanf va essayer de lire un entier depuis l'entrée de
+l'utilisateur. Si l'utilisateur rentre une valeur correcte, result=1
+sinon result=0.
+
+
+    --- code C title="Valisation du domaine" ---
+    if (number >= 1 && number <= 100) {
+        // L'entier est dans la plage attendue
+    } else {
+        // L'entier est hors plage (ex. négatif, trop grand, etc.)
+    }
+
+Cette étape est indépendant du test précédente, on vérifie la cohérence
+des données.
+
+
+Les boucles
+-----------
+
+
+- La boucle for
+La boucle for nous permet d'exécuter un bloc de code de manière répétée
+pour un certain nombre de fois.
+
+La boucle for a trois composants :
+* Initialisation : exécutée une seule fois avant que la boucle commence.
+* Condition : vérifiée entre chaque itération de boucle
+* Update : exécutée après chaque itération
+
+
+    --- code C title="Structure de la boucle for" ---
+    for (initialization; condition; update) {
+        // Code a exécuter
+    }
+
+
+    --- code C title="Boucle for comptant de 1 à 5" ---
+    for (int i = 1; i <= 5; i++) {
+        printf("%d ", i);
+    }
+
+
+
+- La boucle while
+
+La boucle while nous permet d'exécuter un bloc de code aussi longtemps
+que sa condition est vraie.
+
+
+    --- code C title="Structure de la boucle while" ---
+    while (condition) {
+        // Code à répéter
+    }
+
+
+Pour faire une boucle while qui compte de 1 à 5, on peut faire :
+
+    --- code C title="Boucle while comptant de 1 à 5" ---
+    int count = 1;
+    while (count <= 5) {
+        printf("%d ", count);
+        count++;
+    }
+
+
+La boucle continuera jusqu'à ce que count passe à 6, et donc que la
+condition ne soit plus valable, ce qui termine donc la boucle.
+
+
+- La boucle do-while
+la boucle do-while est similaire à la boucle while mais avec une
+différence très importante : le bloc de code dans la boucle est exécutée
+au moins une fois, puis la condition sera consultée.
+
+    --- code C title="Structure de la boucle do-while" ---
+    do {
+        // Code to be executed
+    } while (condition);
+
+
+    --- code C title="Exemple de boucle do-while" ---
+    int number;
+    
+    do {
+        printf("Please enter a positive number: ");
+        scanf("%d", &number);
+    } while (number <= 0);
+    
+    printf("You entered: %d\n", number);
+
+Ainsi, dans ce code, on nous demandera au moins une fois de rentrer un
+nombre. La condition nous fera rester ou sortir de la boucle après
+l'exécution du code.
+
+
+- <span id="break">instruction break</span>
+La déclaration break permet d'arrêter une boucle instantanément
+lorsqu'elle est rencontrée.
+
+    --- code C title="Exemple" ---
+    for (int i = 0; i < 10; i++) {
+        if (i == 6) {
+            break;
+        }
+        printf("%d ", i);
+    }
+
+On va alors avoir :
+
+    --- code C tilte="Output" ---
+    0 1 2 3 4 5
+
+La boucle s'arrête entièrement et ne s'exécute pas pas la suite.
+
+>>> ASTUCE : [Remarque]
+L'instruction break n'est pas à utiliser à chaque problème que l'on
+rencontre. Elle reste très utile dans certain cas comme les switch case.
+Autrement, rappelez-vous qu'il y a presque tout le temps une solution.
+Une boucle for peut être une boucle while et inversement.
+
+    --- code C title="Exemple" ---
+    for (int i = 0; i < n; i++) {
+        if (array[i] == target) {
+            index = i;
+            break; // On a trouvé, inutile de continuer
+        }
+    }
+
+Ce genre de boucle peut se faire en while sans break.
+
+Utilisez cette instruction comme un mécanisme de contrôle.
+
+
+
+- instruction continue
+L'instruction continue arrête l'itération actuelle d'une boucle et
+continue à l'itération suivante.
+
+    --- code C title="Exemple" ---
+    for (int i = 3; i < 9; i++) {
+        if (i == 5) {
+            continue;
+        }
+        printf("%d ", i);
+    }
+
+Cet exemple donne :
+
+    --- code ---
+    3 4 6 7 8
+
+Ici, le chiffre 5 n'est pas écrit.
+
+
+- Boucles imbriquées
+Les boucles imbriquées sont des boucles placées à l'intérieur d'autres
+boucles. Pour chaque itération de la boucle extérieur, celle à
+l'intérieur s'exécute complètement.
+
+    --- code C title="Exemple de boucle imbriquée" ---
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 3; j++) {
+            printf("%d,%d ", i, j);
+        }
+        printf("\n");
+    }
+
+
+    --- code C title="Résultat" ---
+    0,0 0,1 0,2 
+    1,0 1,1 1,2 
+
+
+
+- boucles infinies
+Il y a des situations dans lesquelles on peut avoir besoins de boucles
+infinies comme dans des systèmes embarqués ou pour des programmes qui
+tournent continuellement.
+
+
+    --- code C title="Boucle while ininie" ---
+    while (1) {
+        // code à exécuter
+    }
+
+
+    --- code C title="Boucle for infinie" ---
+    for (;;) {
+        // code to be executed
+    }
+
+
+    --- code C title="Boucle do-while infinie" ---
+    do {
+        // code to be executed
+    } while (1);
+
+Et pour terminer une boucle infinie, on a typiquement besoins de
+l'instruction break.
+
+
+Les fonctions
+-------------
+
+
+- Déclarer une fonction
+
+Une fonction en C est un bloc de code qui accompli une tâche spécifique.
+Les fonctions nous permettent d'organiser le code, le rendre
+réutilisable et améliorer la lisibilité.
+
+    --- code C title="Déclaration d'une fonction" ---
+    return_type function_name(parameter1_type parameter1_name, parameter2_type parameter2_name, ...) {
+        // code to be executed
+        return value; // if the return_type is not void
+    }
+
+
+    --- code C title="Une fonction affichant un message" ---
+    void greet() {
+        printf("Hello, welcome to C programming!");
+    }
+
+
+    --- code C title="Appeler une fonction externe" ---
+    int main() {
+        greet();
+        return 0;
+    }
+
+
+Les fonctions peuvent également prendre des paramètres et retourner des
+valeurs.
+
+
+- Types de retour
+Lorsque l'on défini une fonction, on doit spécifier le type de valeur
+que la fonction renverra à son appelant.
+
+    --- code C title="Fonction retournant un int" ---
+    int sum(int a, int b) {
+        return a + b;
+    }
+
+
+    --- code C title="Fonction retournant un float" ---
+    float average(float a, float b) {
+        return (a + b) / 2;
+    }
+
+le int précédant le nom de la fonction spécifie que cette fonction
+retournera un int.
+
+
+- Paramètres de fonction
+Les fonctions que l'on défini en C peuvent accepter des paramètres (ou
+des arguments), qui sont des valeurs passée à la fonction lorsqu'elle
+est appelée.
+
+
+    --- code C title="fonction avec des paramètres" ---
+    int add(int a, int b) {
+        return a + b;
+    }
+    // Appel de la fonction
+    int result = add(5, 3);
+
+
+
+- Fonctions récursives
+Le principe est simple : résoudre un "gros problème" en le divisant en
+tout un tas de "petits problèmes". Pour ce faire, on va faire en sorte
+que la fonction s'appelle elle-même pour résoudre le problème en
+question petit à petit.
+
+    --- code C title="Fonction récursive retournant n factoriel" ---
+    int factorial(int n) {
+        // Base case: factorial of 0 or 1 is 1
+        if (n <= 1) {
+            return 1;
+        }
+        
+        // Recursive case: n! = n * (n-1)!
+        return n * factorial(n - 1);
+    }
+
+En fonction du nombre que l'on donne à la fonction, elle va effectuer un
+calcul puis se rappeler elle-même avec n-1 jusqu'à ce que n soit à 0. Et
+là le problème est résolu : on a n! (n factoriel).
+
+
+Les tableaux
+------------
+
+
+- Déclarer des tableaux
+
+Les tableaux nous permettent de stocker de multiples valeurs en
+utilisant un seul nom de variable.
+
+
+    --- code c title="Déclarer un tableau d'entier avec 5 éléments" ---
+    int numbers[5];
+
+Cela nous permet de déclarer un tableau pouvant contenir uniquement 5
+entiers.
+
+On peut également initialiser le tableau avec des valeurs :
+
+    --- code c ---
+    int numbers[5] = {10, 20, 30, 40, 50};
+
+
+Et au lieu de définir soi-même la taille du tableau, on peut laisser le
+compilateur décider de lui-même :
+
+    --- code c ---
+    int numbers[] = {10, 20, 30, 40, 50};
+
+
+Et donc, pour stocker un mot par exemple, on peut le faire de deux
+manières :
+
+    --- code c ---
+    char word[] = "HELLO";
+    char word[5] = {'H', 'E', 'L', 'L', 'O'};
+
+ces deux méthodes fonctionnent
+
+Les tableaux en C comme dans beaucoup de langage sont indexé en 0, cela
+signifie que le premier élément est à l'index 0.
+
+Ensuite pour appeler ces données, on utilise donc cet index :
+
+    --- code c ---
+    int numbers[5] = {10, 20, 30, 40, 50}; // Déclaration d'un tableau
+    int firstElement = numbers[0];
+    printf("%d", firstElement);
+
+
+En exécutant cela, on aura dans la sortie le nombre 10.
+
+Pour modifier les données présentent dans le tableau, on procède alors
+de la manière suivante :
+
+    --- code c title="modification de la valeur d'un tableau" ---
+    // Définition du tableau
+    int numbers[5] = {10, 20, 30, 40, 50};
+    // On change le troisième élément 
+    numbers[2] = 35;
+
+
+Après cela, les valeurs du tableau sont : [10, 20, 35, 40, 50].
+
+
+- Tableaux multidimentionnels
+
+Pour la faire simple, ce sont des tableaux de tableaux qui nous
+permettent de représenter des dimensions.
+
+
+    --- code c title="Déclarer un tableaux à deux dimensions" ---
+    int matrix[3][4];
+    // on déclarre 3 colonnes et 4 lignes
+    
+    int matrix[3][4] = {
+        {1, 2, 3, 4},    // Première ligne
+        {5, 6, 7, 8},    // Seconde ligne
+        {9, 10, 11, 12}  // Troisième ligne
+    };
+
+
+Et donc pour accéder et modifier les données de ce tableau, on doit
+donner les coordonnées pour accéder à la dite donnée :
+
+
+    --- code c title="Accéder aux données de tableaux multidimentionnels" ---
+    int value = matrix[1][2];  
+    // On accède à la ligne 1, colonne 2 (La valeur sera 7)
+
+
+
+    --- code c title="Modifier des valeurs d'un tableau multidimentionnel" ---
+    matrix[0][3] = 100;  
+    // Modifie l'élément à la ligne 0, colonne 3 par la valuer 100
+
+
+Et pour parcourir un tableau à 2 dimensions, on peut alors utilisés les
+boucles imbriquées :
+
+
+    --- code c ---
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%d ", matrix[i][j]);
+        }
+        printf("\n");  // Écrire une nouvelle ligne après chaque rangée.
+    }

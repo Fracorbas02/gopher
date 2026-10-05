@@ -1,0 +1,90 @@
+=============
+installVmware
+=============
+
+
+INSTALLER VMWARE SOUS ARCH
+==========================
+La documentation officielle Arch : Arch - installer vmware
+(https://wiki.archlinux.org/title/VMware)
+
+dans un premier temps, il faut mettre à jour son système puis installer
+le package vmware-workstation :
+
+| Veuilez noter le AUR présent dans la doc
+
+Pour l'installer, il faut donc installer le package directement depuis
+l'AUR vmware-workstation
+(https://aur.archlinux.org/packages/vmware-workstation)
+
+Pour ce faire, placez-vous dans le répertoire de votre choix
+
+    --- code bash ---
+    mkdir vmware
+    cd vmware
+    git clone https://aur.archlinux.org/packages/vmware-workstation
+    cd vmware-workstation
+    makepkg -si
+
+
+A partir de là, vous allez probablement avoir une erreur, et vous devrez
+donc installer les paquets suivants pour satisfaire les dépendances :
+
+    --- code bash ---
+    sudo pacman -S dkms fuse2 gtkmm3 libaio libxcrypt-compat
+
+Le dernier packet en erreur est également un paquet AUR, il faudra donc
+l'installer comme suit :
+
+    --- code bash ---
+    cd ..
+    git clone https://aur.archlinux.org/vmware-keymaps.git
+    cd vmware-keymaps
+    makepkg -si
+
+
+Enfin, pour finaliser l'installation :
+
+    --- code bash ---
+    cd ../vmware-workstation
+    makepkg -si
+
+
+Vous ne devriez plus avoir d'erreur et tout doit s'installer.
+
+Maintenant, il y a un autre problème, lorsque vous voulez effectuer
+cette commande :
+
+    --- code bash ---
+    sudo modprobe -a vmw_vmci vmmon
+
+
+Vous avez une erreur que vmmon n'existe pas. Pour corriger cela, la
+solution est ici : could not open cmmon - Stackoverflow
+(https://stackoverflow.com/questions/69045063/vmware-on-arch-could-not-open-dev-vmmon-no-such-file-or-directory)
+
+Il faut dans un premier temps mettre à jour des paquets de Arch :
+
+    --- code bash ---
+    sudo pacman -Syy
+    sudo pacman -S linux
+    reboot
+    sudo pacman linux-headers
+
+
+Réessayez ensuite la commande, maintenant vmware ne devrait plus poser
+de problème.
+
+
+Utiliser les interfaces virtuelles
+----------------------------------
+Très important à noter, les interfaces virtuelles de vmware sont
+uniquement gérées par vmware, si vous essayez de les configurer avec
+autre chose comme systemd-networkd ou Networking il y a de très grande
+chance qu'elles ne fonctionnent pas. Il faut donc utiliser dans les 90%
+du temps l'outil de vmware : sudo vmware-netcfg (ou en graphique dans
+éditeur de réseaux virtuels).
+
+------------------------------------------------------------------------
+Images associées (accessibles depuis le menu gopher) :
+  - /docs/system/linux/archlinux/images/installvmware/vmwarepackage.png : vmwarePackage.png

@@ -1,0 +1,9 @@
+!Debug
+
+Cette partie est assez exotique. Concrètement, c'est un endroit dans lequel je mets des documentations sur mes différents debug et souci que j'ai rencontré dans mon aventure sous Linux. C'est une sorte de bric à brac explicative de problèmes étranges.
+0Panne Bluetooth Mediatek MT7922 sous Arch Linux — méthodologie de diagnostic	/docs/debug/pannebluetoothmt7922.txt
+
+0Gérer le boot Linux sur Arch avec UKI et efibootmgr	/docs/debug/gererbootukiarch.txt
+
+1Retour : Documentation technique (Bastodoc)	/docs
+.

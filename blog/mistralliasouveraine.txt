@@ -1,0 +1,223 @@
+==================================
+Mistral, l'IA française souveraine
+==================================
+
+Le 2026-07-03 / Tags : informatique, open-source, IA
+
+
+Surfons un peu sur une vague déjà passée depuis très longtemps : l'IA.
+Je suis particulièrement lent à la détente, alors je ne m'y mets que
+maintenant ; après tout, il n'est jamais trop tard.
+
+
+
+
+Petite introduction historique
+------------------------------
+Je ne change pas mes vieilles habitudes, j'aime bien comprendre d'où
+provient tout ce que l'on a alors, un petit cours d'histoire
+
+Les premiers travaux fondateurs datent des années 1940-1950 (oui oui, si
+tôt, très tôt même, on venait à peine de créer ce que l'on pouvait
+nommer ordinateur aka Enigma), avec les idées de Shannon (théorie de
+l'information en 1948) sur l'entropie de langage et les modèles de
+prédiction de mots, et Turing (1950) qui pose les bases théoriques de
+l'IA. Mais c'est dans les années 1960-1970 que naissent les premiers
+modèles statistiques de langage, comme les n-grammes (modèles de Markov
+appliqués au texte), conçus pour prédire le mot suivant dans une phrase
+à partir des n-1 précédents.
+
+Ces modèles simples mais efficaces étaient initialement utilisés pour la
+compression de texte et la reconnaissance vocale, puis plus largement
+pour de la traduction automatique statistique (comme le système SYSTRAN
+en 1968 développé pour la commission européenne et l'US air force).
+L'objectif était pragmatique : automatiser la traduction entre langues
+sans recourir à des règles linguistiques manuelles, trop coûteuses à
+maintenir.
+
+Dans les années 1980-1990, l’apprentissage automatique prend le relais
+avec les réseaux de neurones (notamment les RNN, Recurrent Neural
+Networks), capables de capturer des dépendances à longue portée dans le
+texte. Les travaux de Rumelhart et McClelland (1986) sur les réseaux à
+propagation avant (feedforward) et ceux de Elman (1990) sur les RNN
+ouvrent la voie à des modèles distribués du langage, où les mots sont
+représentés par des vecteurs (embeddings) apprenant leurs relations
+sémantiques. Ces avancées visaient à surmonter les limites des
+n-grammes, incapables de généraliser à des contextes non vus. Les
+applications cibles restaient la traduction, mais aussi la génération de
+texte et le dialogue homme-machine.
+
+Mais alors d'où nous vient le tournant qui nous a amené aujourd'hui à
+utiliser des modèles que l'on nomme "LLM" ? Ce tournant s'est produit
+dans les années 2010 avec deux innnovations majeures :
+1. l'apprentissage profond (deep learning), popularisé par Hinton (2006)
+   avec des architectures comme LSTM (Long Short-Term Memory) et GRU qui
+   permettent entre autre les gradients évanescents dans les RNN,
+   permettant d'apprendre des dépendances sur de longues séquences.
+2. L'attention introduite par Bahdanau et al. (2014) pour la traduction
+   automatique, qui permet au modèle de se concentrer sur les parties
+   pertinentes de la séquence d'entrée, améliorant radicalement les
+   performances.
+
+C'est en 2017 que Vaswani et al. (Google) publient "Attention is all you
+need", proposant l'architecture Transformer, qui abandonne les RNN au
+profit de mécanismes d'attention auto-régressifs et parallélisables.
+Cette architecture, conçue pour la traduction se révèle si efficace
+qu'elle est devenue la base des LLM modernes. Les premiers modèles BERT
+(2018, Google) et GPT (2018, OpenAI) exploitent cette architecture pour
+des tâches de compréhension (BERT, bidirectionnel) et de génération
+(GPT, unidirectionnel), en les pré-entraînant sur de grands corpus de
+texte (comme BooksCorpus, Wikipedia et bien d'autres de manière rarement
+légale) via des objectifs auto-supervisés (masked-language-modeling pour
+BERT et next-token-generation pour GPT).
+
+ ========================================
+
+Tout cela nous amène aujourd'hui, où les objectifs de traduction ont été
+dépassés depuis bien longtemps par notre société de consommation. Que
+cela soit de la génération d'image, de texte, de code, on a transformé
+cet outil de traduction par un outil capable de générer toute sorte de
+choses. Cet essor a été permis par la quantité de données avalées par
+ces modèles (toujours plus de texte emmagasiné, si bien qu'on estime
+aujourd'hui que tout internet est déjà utilisé pour l'entraînement de
+ces modèles) mais également la puissance et l'efficience des puces. Nous
+devons cette dernière partie grandement à Nvidia qui a su designer des
+puces particulièrement efficaces et a permis une baisse drastique du
+coût d'entraînement des modèles (devenu la partie la plus coûteuse des
+LLM).
+
+Tout cela a par la même occasion permis une augmentation plus
+qu'impressionnante du prix des composants électronique, plus
+particulièrement de la mémoire informatique sous toutes ses formes (RAM,
+SSD, cache, toute sorte de mémoire). Si bien que beaucoup commencent à
+se demander s'il n'y a pas une forme de complot entre tous les grands
+fabriquants de puce qui leur permettrait de garder les prix au plus haut
+sans se concurrencer... D'autres médias en parleront mieux que mes
+quelques mots :
+* JVTECH
+  (https://www.jeuxvideo.com/news/2091614/et-si-l-augmentation-du-prix-de-la-ram-n-etait-en-realite-qu-une-strategie-commerciale-voici-la-plainte-qui-defend-les-gamers.htm)
+* Gamekult
+  (https://www.gamekult.com/actualite/les-trois-geants-de-la-ram-attaques-en-justice-pour-entente-sur-les-prix-3050871014.html)
+* 01net
+  (https://www.01net.com/actualites/penurie-de-ram-ou-enorme-complot-les-trois-geants-de-la-memoire-traines-en-justice-pour-entente-illegale.html)
+
+
+Et aujourd'hui alors ?
+----------------------
+
+Comme tout le monde je pense, je me suis rapidement pris d'affection
+pour ces outils particulièrement efficaces. En ce moment, la guerre des
+grands acteurs de l'IA se joue principalement sur plusieurs domaines :
+1. Celui qui répond le plus vite
+2. Celui qui répond de manière la plus réfléchie que l'on définit de
+   plus en plus comme une forme "d'intelligence"
+3. Celui qui fait le plus sensation
+
+Il est depuis un peu plus de 6 mois évident que la société Anthropic à
+l'origine de la suite de LLM nommé "Claude" est en tête sur chacun de
+ces domaines. Et je fais partie de ceux qui compte parmis ses
+utilisateurs les plus fidèles (à mon plus grand regret).
+
+Et pour avoir testé leurs modèles de plus en plus souvent, je dois
+avouer qu'il est désormais compliqué de s'en passer. Et ce pour
+plusieurs raisons :
+1. L'efficacité. Être capable de faire quelque chose correctement et
+   plus rapidement ne peut être que bénéfique pour nous ou pour la
+   société pour qui on travaille. Un compromis gagnant gagnant.
+2. L'apprentissage. C'est probablement l'utilisation la plus
+   intéressante selon moi, et là dedan Claude est plus que performant.
+   Avant de devenir le grand remplacement des humains, l'IA est un
+   outil. Un outil capable de faire ce qu'on lui demande, et pour
+   apprendre de nouveaux concepts, de nouvelle méthode, c'est vraiment
+   un outil particulièrement pertinent
+
+Cependant à tout point positifs, ses points négatifs et il faut bien les
+connaîtres. Premièrement, dans cette guerre aux IA, la grande majorité
+des prétendants sont Etats-Uniens, et ce sont donc des sociétés qui ne
+sont pas fiable par définition. Je pense que les récents événements dans
+le domaine tel que la coupure récente des modèles phares de Claude
+(https://www.it-connect.fr/anthropic-coupe-lacces-a-fable-5-et-mythos-5-sur-ordre-du-gouvernement-americain/)
+ou du dernier modèle de chatGPT reflète parfaitement cela. Après tout on
+ne réinvente pas la poudre, on le saurait si les Etats-Unis étaient un
+État qui existait pour le bien du monde. Ses intérêts passent avant
+toute autre chose. Et donc, les données que l'on donne à ces
+entreprises, les réponses qu'elle génèrent peuvent et sont probablement
+déjà largement utilisées de manière illégale (contre la règlementation
+Européenne, les RGPD, l'IA Act, tout ça tout ça...).
+
+Cette vision des chose reste largement à garder lorsque l'on utilise ces
+modèles. Que ça soit Claude chatGPT ou d'autres prétendants
+Etats-Uniens, tous resteront sous l'emprise de l'Etat.
+
+
+Et mistral dans tout ça
+-----------------------
+
+Oui, je suis long à introduire tout ça, mais mieux vaut du contexte pour
+parler du loup, car il ne fait pas l'unanimité.
+
+Premièrement, je sais pertinemment que pour le moment Mistral ressemble
+plus à un modèle GPT3 qu'à un Opus de chez Claude. On peut le voir au
+travers de ses réponses interminables, son incapacité à se corriger, son
+utilisation plus que pénible des émoijis... Des signes qui montrent une
+seule chose : Mistral est loin derrière, et on peut le vérifier de par
+ses réponses que par son porte monnaie. Je vous laisse un avant goût de
+la apitalisation boursière des plus grands
+(https://companiesmarketcap.com/fr/intelligence-artificielle/plus-grandes-entreprises-ia-par-capitalisation-boursiere/),
+puis je vous dit que le porte-monnaie de Mistral approximativement de
+6.5 Milliards d'euros, là où OpenAI (852 Md$) et Anthropic (965 Md$)
+frôlent les 1000 milliards de dollars de valorisation privée, en
+préparation de leur introduction en bourse (IPO) prévue 2026-2027. Donc
+si je résume, je vous fais un article pour vous parler d'une IA
+Française souveraine qui n'a ni la puissance de calcul, ni les moyens
+financiers, ni la politique de son côté, mais de quoi je vous cause ?
+
+Eh bien, on parle aujourd'hui de la seule société qui permet aux
+entreprises du monde entier de faire tourner son modèle de manière
+souveraine sans risquer une fuite de donnée ou une utilisation illégale
+de ces dernières. Mistral permet aux sociétés qui le veulent d'entraîner
+des modèles Customisés capable de tourner dans une infrastructure privée
+complètement hors ligne. Et cerise sur la gateau : Mistral est une
+société Française et donc est RGPD-compliant par défaut, que demander de
+plus pour garantir la sécurité de ses données ? Cela leur permet d'avoir
+des modèles pour aider ces entreprises dans tout un tas de domaine. Et
+ÇA, c'est une chose que seule notre belle petite société française sait
+faire.
+
+Le placement de cette société se fait aussi dans le domaine open-source.
+Leurs modèles sont pour la plupart disponible en ligne et on peut tous
+les faire tourner sur des machines qui en ont la capacité. Vous allez me
+dire que beaucoup d'autres modèles sont open-source ou ont un placement
+similaire. On peut penser à juste titre à des modèles chinois tels que
+Gemma de Google, mais aucun n'a pour le moment cette présence qu'a
+Mistral sur le marché professionnel.
+
+Une certaine gamme de modèle propriétaire (mistral Large par exmeple)
+ont vocation à être déployé en local dans les entreprise ou customisé
+directement dans l'interface web mistral studio.
+
+Aujourd'hui être souverain est devenu au delà d'un simple mot une valeur
+essentielle. Avoir la capacité de sécuriser ses forces les plus
+importantes et les produire sans l'aide de quiconque est extrêmement
+important. De Gaulle nous l'a montré avec le nucléaire et Dassault avec
+l'aviation. L'IA est devenu une arme à part entière, regardez-donc
+Palantir... Une belle société utilisant l'IA pour optimiser les
+décisions de guerre. Quelle belle utilisation de la technologie n'est-ce
+pas ?
+
+Mistral n'est peut-être pas la société la plus performante du moment, ni
+même la plus intéressante à utiliser et elle ne le sera probablement
+jamais, mais elle doit continuer d'exister ou nous serons une fois de
+plus à la merci des USA ou de la Chine comme nous le sommes toujours au
+niveau du cloud ou des solutions d'entreprise (Microsoft 365).
+
+Dans ce domaine, nous ne pouvons que remarquer l'effort que fait le
+gouvernement de développer des solutions open-source pour ne pas
+dépendre des états-unis (LaSuite, Tchap et tous les outils qui s'en
+suivent). Cela montre une volonté forte d'être souverain en
+informatique. Cette partie se montre déjà par l'hébergement des services
+de l'Etat dans les infrastructures du ministère de l'intérieur. Mais
+elle se montre également par le parti pris de l'État de rendre ces
+solutions open-source. C'est littéralement une invitation toute faite
+aux entreprises privées de prendre des solutions développées par un État
+et de contribuer à leur développement !

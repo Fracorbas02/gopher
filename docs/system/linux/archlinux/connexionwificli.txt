@@ -1,0 +1,107 @@
+================
+connexionWifiCLI
+================
+
+
+SE CONNECTER AU WIFI EN LIGNE DE COMMANDE
+=========================================
+
+Lorsque l'on utilise systemd-networkd, on ne possède plus l'interface
+graphique que nous donne GNOME pour le wifi, on se retrouve comme cela :
+
+Donc pour se connecter en wifi, il faut utiliser des outils en ligne de
+commande. J'utilise personnellement iwd.
+
+On doit donc installer l'outil :
+
+    --- code bash ---
+    sudo pacman -Syu
+    sudo pacman -S iwd
+
+
+Ensuite, il faut que l'on ait configuré l'interface wlan0 (ou le nom de
+votre interface wifi) avec systemd-networkd. Simplement faire un fichier
+de conf nommé par exemple : 20-wlan.network dans /etc/systemd/network
+comme suit :
+
+    --- code bash ---
+    [Match]
+    Name=wlan0 # Mettre ici le nom de votre interface réseau wifi
+    
+    [Network]
+    DHCP=yes # Récupération de l'adresse par DHCP
+
+
+On redémarre le service pour prendre en compte tout ça :
+
+    --- code bash ---
+    sudo systemctl restart systemd-networkd
+
+
+Enfin, on peut se connecter à un réseau wifi. On doit lancer l'outil
+d'iwd iwctl On arrive alors dans une CLI.
+
+On doit dans un premier temps initier le scan sur notre interface pour
+détecter les réseaux alentours : station wlan0 scan Rien ne se passe,
+mais l'interface est en train de scannet tous les réseaux autour. Afin
+de les afficher, il faut que l'on utilise :
+
+    --- code bash ---
+    station wlan0 get-networks
+
+On va alors retrouver un affichage comme celui-ci :
+
+    --- code bash ---
+    [iwd]# station wlan0 get-networks 
+                                   Available networks                              
+    --------------------------------------------------------------------------------
+          Network name                      Security            Signal
+    --------------------------------------------------------------------------------
+      >   WIFI0_SSID                        psk                 ****    
+          WIFI1_SSID                        psk                 ****    
+          WIFI2_SSID                        psk                 ****    
+          WIFI3_SSID                        psk                 ****    
+    
+
+
+Une fois que l'on a ces éléments, on doit choisir le SSID et rentrer le
+mot de passe :
+
+    --- code ---
+    station wlan0 connect [le SSID]
+
+
+L'outil nous demande le mot de passe, si tout est bon, on a aucun
+message, mais on peut afficher notre état en faisant :
+
+    --- code ---
+    station wlan0 show
+
+
+
+    --- code ---
+    [iwd]# station wlan0 show 
+                                     Station: wlan0                               *
+    --------------------------------------------------------------------------------
+      Settable  Property              Value                                          
+    --------------------------------------------------------------------------------
+                Scanning              no                                               
+                State                 connected      
+
+On voit donc que je suis connecté au réseau.
+
+quittez l'outil avec exit afin de voir si votre interface a bien pris
+une IP avec la configuration qu'on a donné tout à l'heure à
+systemd-networkd :
+
+    --- code ---
+    13: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+        link/ether 42:42:42:aa:aa:aa brd ff:ff:ff:ff:ff:ff
+        inet 192.168.1.67/24 metric 1024 brd 192.168.1.255 scope global dynamic wlan0
+
+
+On récupère bien une IP, tout fonctionne.
+
+------------------------------------------------------------------------
+Images associées (accessibles depuis le menu gopher) :
+  - /docs/system/linux/archlinux/images/connexionwificli/archgnomenetworknotavailable.png : ArchGnomeNetworkNotAvailable.png

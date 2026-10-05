@@ -1,0 +1,112 @@
+=============
+InstallGophie
+=============
+
+
+INSTALLER UN NAVIGATEUR GOPHER
+==============================
+
+
+Déjà c'est quoi gopher ?
+------------------------
+
+
+- Qu'est-ce que Gopher ?
+Dans les tout début du web, plusieurs protocoles étaient en
+développement pour établir des connexions sur des serveurs web.
+Aujourd'hui le plus connu reste HTTP, c'est le protocole que l'on
+utilise tous les jours lorsque l'on navigue sur internet.
+
+Mais dans les premières années du web, les protocoles HTTP (1990) et
+Gopher (1991) étaient en concurence pour savoir qui allait rester en
+tant que protocole utilisé sur le web.
+
+Ces deux protocoles se distingues dans leur utilisation, ils avaient
+tous les deux pour but d'être utilisés pour faire passer des données sur
+internet.
+
+
+- Gopher vs HTTP
+Concrètemet :
+* Gopher :
+	* Objectif : développé dans les années 90 pour organiser des distribuer
+	  des documents et d'autres informations. Il a été designé pour
+	  pourvoir un système de menu hiérarchique. Chaque élément pouvait lier
+	  à un autre menu ou un fichier. C'est un protocole qui est beaucoup
+	  plus simple si on le compare avec HTTP, c'est plus simple pour les
+	  utilisateurs non technique
+	* Structure : Gopher utilise un système de menu où chaque élément de
+	  menu renvoie à un fichier ou un autre menu. Cette structure
+	  hiérarchique facilite la navigation et la recherche d'information
+	  mais bien moins souple que ce que l'on retrouve dans HTTP avec le
+	  modèle hypertext du web.
+	* Contenu : Gopher traitait principalement des contenus textuels et des
+	  fichiers simples. Il ne prenait pas en charge les images en ligne ou
+	  les contenus multimédias complexes, ce qui a limité son intérêt au
+	  fur et à mesure de l'évolution d'internet.
+* HTTP :
+	* Objectif : HTTP a été développé pour soutenir le World Wide Web
+	  (WWW), qui visait à fournir un moyen plus souple et interactif
+	  d'accéder à l'information et de la partager.HTTP permet de créer des
+	  documents hypertextes (HTML) qui peuvent inclure des liens vers
+	  d'autres documents, des images et du contenu multimédia.
+	* Structure : HTTP utilise un modèle basé sur des documents où les
+	  liens peuvent être intégrés dans des documents. Cela permet de créer
+	  un réseau d'informations plus dynamique et interconnecté. Le modèle
+	  hypertexte a facilité la création d'un contenu multimédia riche et
+	  d'applications web interactives.
+	* Contenu : prend en charge un large éventail de types de contenu, y
+	  compris le texte, les images, les vidéos, etc. La possibilité
+	  d'intégrer du contenu multimédia et de créer des pages web
+	  interactives a constitué un avantage significatif par rapport à
+	  Gopher.
+Modèle client-serveur : Les clients HTTP (navigateurs web) sont plus
+complexes que les clients Gopher, car ils doivent gérer une grande
+variété de types de contenu et de fonctions. Toutefois, cette complexité
+permet une expérience utilisateur plus riche et plus interactive.
+
+Et donc, désormais Gopher n'est quasiment plus utilisé, on ne retrouve
+que quelques projets qui permettent de naviguer en Gopher sur internet,
+nottament le projet Gophie (https://gophie.org/).
+
+Encore faut-il trouver des sites en Gopher sur internet...
+
+
+Installation de Gopher
+----------------------
+Pour installer gopher, récupérez simplement le .tar fourni directement
+sur le site de Gophie (https://gophie.org/)
+
+Une fois que vous avez récupéré le fichier, utilisez tar pour
+décompresser le fichier :
+
+    --- code ---
+    tar -xvf Gophie-1.1-Linux.tar.gz
+
+
+Une fois fait, vous devez avoir un dossier dans lequel est présent le
+fichier Gophie. Ajoutez les droits d'exécution au fichier :
+
+    --- code ---
+    cd Gophie-1.1-Linux
+    chmod 750 Gophie
+
+
+Désormais vous devriez avoir une erreur vous disant que java n'est pas
+installé.
+
+Pour corriger cette erreur, utiliser ces commandes :
+
+    --- code ---
+    sudo pacman -S java-runtime-common
+    sudo pacman -S jdk8-openjdk
+
+
+Puis lancer gophie, et appréciez utiliser un protocole vieux de 30 ans.
+
+Pour chercher une URL, il faut que vous la mettiez tout en bas de
+l'application :
+
+------------------------------------------------------------------------
+Images associées (accessibles depuis le menu gopher) :
+  - /docs/system/linux/archlinux/images/installgophie/howtousegophie.png : HowToUseGophie.png

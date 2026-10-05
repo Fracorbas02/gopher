@@ -1,0 +1,52 @@
+=======================
+le triple Handshake TCP
+=======================
+
+
+ÉCHANGE SYN / ACK TCP
+=====================
+
+Lorsque l'on effectue des échanges sur internet, on doit dans un premier
+temps établir une sesison avec le serveur que l'on a en face. C'est
+comme cela que fonctionne TCP pour avoir un contrôle des erreurs et des
+paquets qui sont envoyés sur le réseau.
+
+Pour cela, il y a des échanges préalable nommé :
+* SYN pour Synchronisation
+* ACK pour Acknoledge (prise de connaissance en français).
+
+une fois cet échange effectué, le client et le serveur peuvent dialoguer
+et échanger des informations.
+
+Afin que rien ne soit perdu, le protocole segmente les données qu'il
+envoie. À chaque fois que les données sont envoyées, un paquet ACK est
+envoyé par le destinataire pour dire qu'il a bien reçu le paquet.
+
+Enfin, lorsque les échanges sont terminés, il faut fermer la connexion
+entre le client et le serveur, on utilise donc le message FIN.
+
+Concrètement, cela fonctionne comme suit :
+
+    --- code mermaid ---
+    sequenceDiagram
+        participant Client
+        participant Server
+        
+        Note over Client,Server: Étape 1 : Établissement de connexion (Three-Way Handshake)
+        Client->>Server: SYN (Synchronize)
+        Server->>Client: SYN-ACK (Synchronize-Acknowledge)
+        Client->>Server: ACK (Acknowledge)
+        Note over Client,Server: Connexion établie, données échangées
+    
+        Note over Client,Server: Étape 2 : Transmission de données
+        Client->>Server: Data Packet 1
+        Server->>Client: ACK (Acknowledgement for Packet 1)
+        Client->>Server: Data Packet 2
+        Server->>Client: ACK (Acknowledgement for Packet 2)
+    
+        Note over Client,Server: Étape 3 : Fermeture de connexion (Four-Way Handshake)
+        Client->>Server: FIN (Finish)
+        Server->>Client: ACK (Acknowledge FIN)
+        Server->>Client: FIN (Finish)
+        Client->>Server: ACK (Acknowledge FIN)
+        Note over Client,Server: Connexion terminée

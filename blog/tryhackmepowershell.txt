@@ -1,0 +1,463 @@
+==============================
+TryHackMe - Windows Powershell
+==============================
+
+Le 2026-08-30 / Tags : informatique, Windows, cybersecurite, tools
+
+
+J'ai récemment commencé à suivre quelques parcours sur TryHackMe, et
+l'un d'entre eux passe en revue PowerShell. Le cours est plutôt bien
+fait, mais comme les machines du lab et le VPN étaient down, j'ai dû
+tout faire en local. Du coup, j'en ai profité pour consolider mes notes
+et en faire un article, parce que PowerShell, c'est pas juste un CMD
+amélioré, c'est un outil qu'il faut comprendre pour de vrai si on veut
+faire de l'administration Windows sérieuse ou de la sécu.
+
+
+
+
+PowerShell, c'est quoi exactement
+---------------------------------
+
+La définition officielle de Microsoft dit que PowerShell est une
+solution d'automatisation multiplateforme composée d'un shell en ligne
+de commande, d'un langage de script et d'un framework de gestion de
+configuration. Concrètement, c'est un shell orienté objet construit sur
+le .NET, et c'est ce dernier point qui change tout.
+
+Dans un shell classique — que ce soit CMD sous Windows ou bash sous
+Linux — tout est du texte. La sortie d'une commande est une chaîne de
+caractères, et si on veut en extraire une information, il faut parser.
+PowerShell fonctionne autrement : quand on lance une commande, on
+récupère des objets .NET complets, avec leurs propriétés et leurs
+méthodes. Pas besoin de découper du texte avec awk ou des pipes
+compliqués, on manipule directement des structures de données.
+
+Petit historique pour situer le truc. Au début des années 2000, Windows
+devenait de plus en plus présent en environnement entreprise, et les
+outils classiques comme cmd.exe et les batch files ne suivaient plus.
+Jeffrey Snover, ingénieur chez Microsoft, a constaté que Windows gérait
+les opérations système avec des données structurées et des APIs, là où
+Unix traitait tout comme du texte. Porter les outils Unix sur Windows
+n'avait donc pas beaucoup de sens. Sa solution a été de développer une
+approche orienté objet, en combinant la simplicité du scripting avec la
+puissance du framework .NET. PowerShell est sorti en 2006, d'abord
+exclusif à Windows, puis est devenu open source et multiplateforme en
+2016 avec PowerShell Core, qui tourne désormais aussi sur macOS et
+Linux.
+
+
+La notion d'objet
+-----------------
+
+Pour comprendre l'intérêt de PowerShell, il faut saisir ce qu'est un
+objet dans ce contexte. En programmation, un objet est une entité qui
+possède des propriétés (ses caractéristiques) et des méthodes (ses
+actions). Par exemple, un objet « fichier » a des propriétés comme son
+nom, sa taille, sa date de modification, et des méthodes comme copier,
+déplacer ou supprimer.
+
+Dans un shell traditionnel, si on veut la taille d'un fichier, on
+récupère une ligne de texte et on doit l'extraire. Dans PowerShell, le
+fichier est un objet, et sa taille est directement accessible comme
+propriété. C'est ce qui rend le piping si puissant : on ne fait pas
+transiter du texte entre les commandes, on fait transiter des objets
+complets.
+
+
+Les cmdlets et la syntaxe Verb-Noun
+-----------------------------------
+
+Les commandes PowerShell s'appellent des cmdlets (prononcé «
+command-lets »). Elles suivent toutes une convention de nommage
+Verbe-Nom, ce qui les rend très lisibles : le verbe décrit l'action, le
+nom décrit l'objet sur lequel porte l'action. Par exemple, Get-Content
+récupère le contenu d'un fichier, Set-Location change le répertoire
+courant.
+
+Trois cmdlets sont indispensables pour commencer :
+
+Get-Command liste toutes les commandes disponibles dans la session —
+cmdlets, fonctions, alias et scripts. On peut filtrer la sortie, par
+exemple pour n'afficher que les fonctions :
+
+
+    --- code ---
+    Get-Command -CommandType "Function"
+
+
+ou pour lister toutes les commandes qui commencent par un verbe donné,
+comme Remove :
+
+
+    --- code ---
+    Get-Command -Verb Remove
+
+
+Get-Help est l'équivalent du man sous Linux. Il affiche la documentation
+d'un cmdlet, sa syntaxe, ses paramètres et des exemples :
+
+
+    --- code ---
+    Get-Help Get-Date
+    Get-Help Get-Date -examples
+
+
+Get-Alias liste les alias disponibles. Pour faciliter la transition
+depuis d'autres shells, PowerShell embarque des alias qui pointent vers
+les cmdlets correspondants : dir est un alias pour Get-ChildItem, cd
+pour Set-Location, cat pour Get-Content. La commande echo,
+traditionnelle sous CMD et bash, est un alias pour Write-Output.
+
+
+Étendre PowerShell avec des modules
+-----------------------------------
+
+PowerShell peut être étendu en téléchargeant des modules (des
+collections de cmdlets) depuis des dépôts en ligne comme PowerShell
+Gallery. Find-Module cherche des modules, Install-Module les installe :
+
+
+    --- code ---
+    Find-Module -Name "PowerShell*"
+    Install-Module -Name "PowerShellGet"
+
+
+Pratique quand on a besoin de cmdlets spécifiques pour interagir avec un
+service particulier — un module GitHub, un module Azure, un module pour
+gérer du YAML, etc.
+
+
+Naviguer dans le système de fichiers
+------------------------------------
+
+PowerShell propose un ensemble de cmdlets pour gérer le système de
+fichiers, avec une approche unifiée : là où CMD utilise des commandes
+séparées pour les fichiers et les répertoires (mkdir, del, rmdir),
+PowerShell utilise les mêmes cmdlets pour les deux.
+
+Get-ChildItem liste le contenu d'un répertoire. C'est l'équivalent de
+dir sous CMD ou ls sous Linux. Sans paramètre, il affiche le contenu du
+répertoire courant :
+
+
+    --- code ---
+    PS C:\Users\captain> Get-ChildItem
+    
+        Directory: C:\Users\captain
+    
+    Mode        LastWriteTime         Length Name
+    ----        -------------         ------ ----
+    d-r---      5/8/2021   9:15 AM          Desktop
+    d-r---      9/4/2024  10:58 AM          Documents
+    d-r---      5/8/2021   9:15 AM          Downloads
+
+
+Set-Location change le répertoire courant, comme cd :
+
+
+    --- code ---
+    Set-Location -Path ".\Documents"
+
+
+New-Item crée un fichier ou un répertoire, selon le paramètre -ItemType
+:
+
+
+    --- code ---
+    New-Item -Path ".\captain-cabin\captain-wardrobe" -ItemType "Directory"
+    New-Item -Path ".\captain-cabin\captain-wardrobe\captain-boots.txt" -ItemType "File"
+
+
+Remove-Item supprime indifféremment fichiers et répertoires, là où CMD
+sépare del et rmdir. Copy-Item et Move-Item copient et déplacent, comme
+leurs équivalents copy et move sous CMD.
+
+Get-Content affiche le contenu d'un fichier, comme type sous CMD ou cat
+sous Linux :
+
+
+    --- code ---
+    Get-Content -Path ".\captain-hat.txt"
+
+
+
+Le piping, le filtrage et le tri
+--------------------------------
+
+Le piping (|) existe dans tous les shells, mais dans PowerShell il est
+fondamentalement différent : il transmet des objets, pas du texte. Ce
+qui veut dire que la commande suivante dans le pipeline reçoit des
+objets complets avec toutes leurs propriétés, et peut filtrer, trier ou
+transformer directement sur ces propriétés sans aucun parsing.
+
+Pour trier les fichiers d'un répertoire par taille :
+
+
+    --- code ---
+    Get-ChildItem | Sort-Object Length
+
+
+Get-ChildItem récupère les fichiers en tant qu'objets, le pipe les
+envoie à Sort-Object qui les trie sur la propriété Length. Simple et
+direct.
+
+Where-Object filtre les objets selon des conditions. Pour ne lister que
+les fichiers .txt :
+
+
+    --- code ---
+    Get-ChildItem | Where-Object -Property "Extension" -eq ".txt"
+
+
+L'opérateur -eq (« equal to ») fait partie d'une famille d'opérateurs de
+comparaison classiques qu'on retrouve aussi en bash ou en Python :
+
+- -ne : « not equal », exclut les objets qui correspondent au critère
+- -gt : « greater than », comparaison stricte (les objets égaux au seuil
+  sont exclus)
+- -ge : « greater than or equal to », version non stricte de -gt
+- -lt : « less than », comparaison stricte
+- -le : « less than or equal to », version non stricte de -lt
+
+Pour filtrer sur un motif plutôt que sur une égalité exacte, on utilise
+-like avec un wildcard :
+
+
+    --- code ---
+    Get-ChildItem | Where-Object -Property "Name" -like "ship*"
+
+
+Select-Object sélectionne des propriétés spécifiques ou limite le nombre
+d'objets retournés. Pratique pour affiner une sortie quand on n'a pas
+besoin de toutes les propriétés :
+
+
+    --- code ---
+    Get-ChildItem | Select-Object Name,Length
+
+
+Enfin, Select-String cherche des motifs de texte dans des fichiers, à la
+manière de grep sous Linux ou findstr sous CMD. Il supporte les
+expressions régulières :
+
+
+    --- code ---
+    Select-String -Path ".\captain-hat.txt" -Pattern "hat"
+
+
+Là où ça devient intéressant, c'est qu'on peut chaîner tout ça. Le
+pipeline n'est pas limité à deux cmdlets — on peut enchaîner tri, filtre
+et sélection pour construire des requêtes précises. Par exemple, pour
+afficher le plus gros fichier d'un répertoire :
+
+
+    --- code ---
+    Get-ChildItem | Sort-Object Length -Descending | Select-Object -First 1
+
+
+
+Informations système et réseau
+------------------------------
+
+PowerShell propose des cmdlets pour récupérer des informations
+détaillées sur la machine, bien au-delà de ce que permettent les
+commandes traditionnelles.
+
+Get-ComputerInfo récupère un snapshot complet de la configuration
+système : OS, matériel, BIOS, build, tout ça en une seule commande. Là
+où systeminfo sous CMD ne renvoie qu'un sous-ensemble de ces
+informations.
+
+Get-LocalUser liste les comptes utilisateurs locaux avec leur statut
+(activé ou non) et leur description. Utile pour vérifier rapidement la
+configuration de sécurité d'une machine :
+
+
+    --- code ---
+    PS C:\Users\captain> Get-LocalUser
+    
+    Name               Enabled Description
+    ----               ------- -----------
+    Administrator      True    Built-in account for administering the computer/domain
+    captain            True    The beloved captain of this pirate ship.
+    DefaultAccount     False   A user account managed by the system.
+    Guest              False   Built-in account for guest access to the computer/domain
+
+
+Côté réseau, deux cmdlets remplacent ipconfig avec beaucoup plus de
+détail. Get-NetIPConfiguration affiche la configuration des interfaces :
+adresses IP, DNS, passerelles. Get-NetIPAddress liste toutes les
+adresses IP configurées sur le système, y compris celles qui ne sont pas
+actives, avec le prefix length, l'address family, l'état, etc.
+
+
+    --- code ---
+    PS C:\Users\captain> Get-NetIPConfiguration
+    
+    InterfaceAlias       : Ethernet
+    InterfaceIndex       : 5
+    InterfaceDescription : Amazon Elastic Network Adapter
+    NetProfile.Name      : Network 3
+    IPv4Address          : 10.10.178.209
+    IPv4DefaultGateway   : 10.10.0.1
+    DNSServer            : 10.0.0.2
+
+
+
+Analyse en temps réel
+---------------------
+
+Au-delà des informations statiques, PowerShell permet d'inspecter l'état
+dynamique du système : processus, services, connexions réseau.
+
+Get-Process liste tous les processus en cours d'exécution avec leur
+consommation CPU et mémoire. C'est l'équivalent de tasklist sous CMD ou
+ps sous Linux, mais avec des objets qu'on peut filtrer et trier :
+
+
+    --- code ---
+    PS C:\Users\captain> Get-Process
+    
+    Handles  NPM(K)    PM(K)      WS(K)     CPU(s)     Id  SI ProcessName
+    -------  ------    -----      -----     ------     --  -- -----------
+         67       5      872        500       0.06   2340   0 AggregatorHost
+         55       5      712       2672       0.02   3024   0 AM_Delta_Patch
+        309      13    18312       1256       0.52   1524   0 amazon-ssm-agent
+
+
+Get-Service affiche le statut des services : Running, Stopped, Paused.
+Indispensable en troubleshooting, mais aussi en forensics pour repérer
+des services anormaux installés sur la machine.
+
+
+    --- code ---
+    PS C:\Users\captain> Get-Service
+    
+    Status   Name               DisplayName
+    ------   ----               -----------
+    Stopped  Amazon EC2Launch   Amazon EC2Launch
+    Running  AmazonSSMAgent     Amazon SSM Agent
+    Stopped  AppIDSvc           Application Identity
+    Running  BFE                Base Filtering Engine
+
+
+Get-NetTCPConnection affiche les connexions TCP actives, avec les
+endpoints locaux et distants, l'état de la connexion et le process ID
+propriétaire. C'est l'équivalent de netstat, mais encore une fois sous
+forme d'objets filtrables. Particulièrement utile en réponse à incident
+ou en analyse de malware pour repérer des connexions vers un serveur
+contrôlé par un attaquant.
+
+Get-FileHash calcule le hash d'un fichier (SHA256 par défaut). En
+réponse à incident ou en threat hunting, ça permet de vérifier
+l'intégrité d'un fichier ou de chercher un hash connu dans des bases de
+données d'IOCs :
+
+
+    --- code ---
+    PS C:\Users\captain\Documents\captain-cabin> Get-FileHash -Path .\ship-flag.txt
+    
+    Algorithm       Hash                      Path
+    ---------       ----                      ----
+    SHA256          54D2EC3C12BF3D[...]       C:\Users\captain\Documents\captain-cabin\ship-flag.txt
+
+
+
+- Les Alternate Data Streams
+
+Sous NTFS, un fichier peut contenir des flux de données alternatifs
+(Alternate Data Streams, ou ADS). C'est une feature du système de
+fichiers qui permet d'attacher des données cachées à un fichier, au-delà
+de son contenu visible. Le flux :$DATA est le flux par défaut qui
+contient le contenu normal du fichier, mais on peut ajouter des flux
+nommés qui n'apparaissent pas avec un simple Get-Content.
+
+PowerShell permet d'inspecter ces flux avec le paramètre -Stream :
+
+
+    --- code ---
+    PS C:\Users\Alex\Documents> Get-Item -Path "C:\House\house_log.txt" -Stream *
+    
+    FileName      : C:\House\house_log.txt
+    Stream        : :$DATA
+    Length        : 13
+    
+    FileName      : C:\House\house_log.txt
+    Stream        : housinginfo
+    Length        : 21
+
+
+Ici, :$DATA est le contenu normal du fichier, et housinginfo est un ADS
+attaché au fichier. Les ADS sont un vecteur classique en forensics et en
+sécurité : un attaquant peut cacher du payload ou des données dans un
+flux alternatif sans modifier le contenu visible du fichier. Savoir les
+détecter fait partie des bases de l'analyse Windows.
+
+
+Scripting et exécution distante
+-------------------------------
+
+PowerShell n'est pas qu'un shell interactif, c'est aussi un langage de
+script complet. On peut écrire des scripts dans des fichiers .ps1 et les
+exécuter pour automatiser des tâches répétitives : analyse de logs,
+détection d'anomalies, extraction d'IOCs, énumération de systèmes,
+exécution de commandes à distance.
+
+En cybersécurité, le scripting PowerShell est une compétence
+transversale. Côté défense, il permet d'automatiser l'analyse de logs,
+la détection d'indicateurs de compromission, le scan de systèmes à la
+recherche de signes d'intrusion. Côté offensif, il sert à l'énumération,
+l'exécution de commandes à distance, l'obfuscation de payloads pour
+contourner des défenses. Et côté administration, il permet d'automatiser
+des vérifications, de gérer des configurations à grande échelle,
+d'appliquer des politiques de sécurité.
+
+Le cmdlet qui mérite qu'on s'y attarde, c'est Invoke-Command. Il permet
+d'exécuter des commandes ou des scripts sur des machines distantes. Pour
+un administrateur, c'est l'outil de base pour gérer un parc de machines.
+Pour un pentester, c'est un moyen d'exécuter des payloads sur des
+cibles.
+
+Pour exécuter un script sur une machine distante :
+
+
+    --- code ---
+    Invoke-Command -FilePath c:\scripts\test.ps1 -ComputerName Server01
+
+
+Pour exécuter une commande à distance, sans script, avec un -ScriptBlock
+:
+
+
+    --- code ---
+    Invoke-Command -ComputerName Server01 -Credential Domain01\User01 -ScriptBlock { Get-Culture }
+
+
+Et sans credentials, si le contexte le permet :
+
+
+    --- code ---
+    Invoke-Command -ComputerName RoyalFortune -ScriptBlock {Get-Service}
+
+
+Ce qu'il faut retenir, c'est qu'on n'a pas besoin de savoir scripter
+pour profiter de la puissance d'Invoke-Command. Le -ScriptBlock accepte
+n'importe quelle commande PowerShell entre accolades, et le résultat est
+le même que si on tapait la commande directement sur la machine
+distante.
+
+
+Pour conclure
+-------------
+
+PowerShell est un outil qu'on a tendance à sous-estimer quand on vient
+du monde Linux, parce qu'on le réduit souvent à un CMD amélioré. Mais
+l'approche orientée objet change fondamentalement la manière dont on
+interagit avec le système : pas de parsing de texte, des objets complets
+qu'on filtre et qu'on trie directement sur leurs propriétés, un langage
+de script complet, et une capacité d'exécution distante native.
+
+Je reste toujours assez sceptique sur tout ça, mais il faut avouer que
+ce changement de paradigme n'est pas forcément une mauvaise chose. Mais
+passer d'un monde à l'autre est assez compliqué.

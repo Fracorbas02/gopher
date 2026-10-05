@@ -1,0 +1,75 @@
+============
+mon Home-Lab
+============
+
+Le 2026-05-29 / Tags : informatique, open-source, system, Linux, lab
+
+
+Ça fait un petit bout de temps que je fais des articles sur tout et
+rien, que je teste des choses sur ce qui me passe sous la main ou que je
+vois dans ma vie professionnelle.
+
+Mais je dois reconnaître qu'il me manque pas mal de chose lorsque j'ai
+besoin de tester des éléments concrets, que ça soit de
+l'authentification, des protocoles  ou autre, très souvent on a besoin
+d'avoir une petite infra personnelle.
+
+
+Ducoup voilà ce que je vais faire : une petite infra pour tester tout un
+tas de truc. Et je me servirais de ça dans de futurs articles afin
+d'avoir des éléments plus complets.
+
+## L'architecture du projet
+
+
+Objectifs du Home-Lab
+---------------------
+
+Ce lab a pour but de simuler un environnement de production miniature
+pour tout un tas de chose.
+
+Aujourd'hui, je possède un vieu serveur DELL R620 avec 32Go de RAM,
+l'objectif n'est pas forcément de faire une infra complètement poussée,
+mais bon... Je vais utiliser ça pour les expériences que je ferais plus
+tard alors voilà l'objectif :
+
+
+
+
+Architecture globale
+--------------------
+
+
+- Schéma d’ensemble
+
+    --- code mermaid ---
+    graph TD
+        Internet((Internet)) --> FAI_Box[FAI Box<br>IP Publique]
+        FAI_Box --> Proxmox[Proxmox VE<br>Hôte Hyperviseur]
+        Proxmox -->|ens18| OPNsense[OPNsense<br>Firewall/Routeur]
+        Proxmox -->|vmbr0| OPNsense
+        OPNsense -->|WAN| FAI_Box
+        OPNsense -->|LAN| LAN[LAN Physique<br>192.168.1.0/24]
+        OPNsense -->|Bridge<br>vlan 10,20| Bridge[Bridge vmbr1]
+        Bridge --> DMZ[DMZ<br>10.0.10.0/24]
+        Bridge --> |vlan 20|Internal[Internal<br>10.0.20.0/24]
+        DMZ --> |vlan 10|GitLab[GitLab CE<br>10.0.10.10]
+        Bridge -->|vlan 40|Auth[FreeIPA <br>10.0.40.0/24]
+        Internal --> Monitoring[Stack SIEM + SNMP<br>10.0.20.30]
+        Bridge --> |vlan 30| TestVM[TestVM<br>Linux]
+
+Comme j'ai pu l'expliquer dans un article précédent : Les réseaux
+proxmox, je vais pouvoir mettre tout ça en pratique, et notamment mettre
+des interfaces vlan dans mon OpnSense.
+
+Donc voilà l'objectif, je vais petit à petit faire ça dans des articles
+à venir. Quelques mots tout de même sur tout ça.
+
+Déjà, comme vous vous en doutez, tout est sous Linux, que ça soit
+l'authentification, la rétention des logs, leur analyse. Grosso modo, ce
+que je veux réaliser c'est une infra certes simples mais utilisant les
+bonnes pratiques de l'informatique.
+
+On se redit dans pas si longtemps pour le début de tout ça, expliquer
+l'interraction de chaque serveurs / service dans un seul article serait
+trop complexe à écrire et à lire alors flemme.

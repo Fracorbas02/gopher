@@ -1,0 +1,459 @@
+=========================
+Networking Core Protocols
+=========================
+
+Tags : TryHackMe, Réseau, DNS, HTTP, FTP, SMTP, POP3, IMAP, TLS
+
+
+NETWORKING CORE PROTOCOLS — TRYHACKME
+=====================================
+
+| Type : Room d'exercice (3e sur 4 dans la série networking)
+| Prérequis : Modèle OSI, TCP/IP, Ethernet, IP, TCP
+| Date : 02/09/2026
+
+Cette room passe en revue les protocoles applicatifs fondamentaux via
+des sessions manuelles (telnet / openssl s_client). L'intérêt principal
+est de manipuler chaque protocole à la main, sans client automatisé,
+pour comprendre exactement ce qui transite sur le réseau.
+
+
+DNS
+---
+
+DNS opère en couche 7 (OSI) sur les ports UDP 53 et TCP 53 (fallback).
+Quatre types d'enregistrements couverts dans la room :
+
+- A : mappe un hostname vers une ou plusieurs adresses IPv4.
+- AAAA (quad-A, pas AA ou AAA) : équivalent IPv6 du record A.
+- CNAME : mappe un nom de domaine vers un autre nom de domaine (alias).
+- MX : spécifie le serveur mail responsable du domaine. C'est ce que
+  interroge un MTA quand on envoie un email vers un domaine.
+
+
+- Résolution avec nslookup
+
+
+    --- code bash ---
+    nslookup www.example.com
+
+
+
+    --- code text ---
+    Server:         127.0.0.53
+    Address:        127.0.0.53#53
+    
+    Non-authoritative answer:
+    Name:   www.example.com
+    Address: 93.184.215.14
+    Name:   www.example.com
+    Address: 2606:2800:21f:cb07:6820:80da:af6b:8b2c
+
+
+
+- Capture tshark
+
+Une requête nslookup génère 4 paquets DNS : une query A, sa réponse, une
+query AAAA, sa réponse.
+
+
+    --- code bash ---
+    tshark -r dns-query.pcapng -Nn
+
+
+
+    --- code text ---
+    1 0.000000 192.168.66.89 -> 192.168.66.1  DNS 86  Standard query 0x2e0f A www.example.com OPT
+    2 0.059049 192.168.66.1  -> 192.168.66.89 DNS 102 Standard query response 0x2e0f A www.example.com A 93.184.215.14 OPT
+    3 0.059721 192.168.66.89 -> 192.168.66.1  DNS 86  Standard query 0x96e1 AAAA www.example.com OPT
+    4 0.101568 192.168.66.1  -> 192.168.66.89 DNS 114 Standard query response 0x96e1 AAAA www.example.com AAAA 2606:2800:21f:cb07:6820:80da:af6b:8b2c OPT
+
+
+
+WHOIS
+-----
+
+WHOIS n'est pas un acronyme (prononcé "who is"). Tout registrant de
+domaine doit fournir des informations de contact (nom, téléphone, email,
+adresse) qui sont publiques dans les enregistrements WHOIS. Des services
+de confidentialité (ex : Domains By Proxy) peuvent masquer ces
+informations.
+
+
+    --- code bash ---
+    whois example.com
+
+
+Le retour inclut : registrar, dates de création / mise à jour /
+expiration, et informations du registrant (ou un masquage de
+confidentialité si activé).
+
+
+HTTP / HTTPS
+------------
+
+HTTP définit la communication entre le navigateur et le serveur web.
+Ports TCP 80 (HTTP) et 443 (HTTPS), parfois 8080 et 8443.
+
+
+- Méthodes HTTP
+
+- GET : récupère une ressource (page HTML, image, etc.).
+- POST : soumet des données au serveur (formulaire, upload).
+- PUT : crée ou écrase une ressource existante.
+- DELETE : supprime une ressource.
+
+
+- Session HTTP via telnet
+
+
+    --- code bash ---
+    telnet 10.114.186.123 80
+
+
+Pour récupérer la page par défaut :
+
+
+    --- code text ---
+    GET / HTTP/1.1
+    Host: anything
+
+
+Pour un fichier spécifique :
+
+
+    --- code text ---
+    GET /file.html HTTP/1.1
+    Host: anything
+
+
+
+- Capture Wireshark (HTTP)
+
+La capture montre l'échange entre le client (Firefox) et le serveur web
+(nginx/1.18.0 Ubuntu). Le navigateur envoie une requête GET / HTTP/1.1
+avec le header Host:, le serveur répond HTTP/1.1 200 OK suivi du contenu
+HTML. Wireshark affiche le trafic client en rouge et serveur en bleu,
+incluant des métadonnées non rendues (version du serveur, date de
+dernière modification, etc.).
+
+
+FTP
+---
+
+FTP est optimisé pour le transfert de fichiers et peut atteindre des
+vitesses supérieures à HTTP. Le canal de contrôle utilise TCP 21 ; les
+données transitent sur une connexion séparée (mode actif ou passif).
+
+
+- Commandes FTP
+
+- USER : identifiant
+- PASS : mot de passe
+- RETR : télécharger un fichier du serveur vers le client
+- STOR : uploader un fichier du client vers le serveur
+- LIST (client tape ls) : lister les fichiers
+- TYPE : mode de transfert (ascii / binary)
+- QUIT : déconnexion
+
+
+- Session FTP anonyme
+
+
+    --- code bash ---
+    ftp 10.114.186.123
+
+
+
+    --- code text ---
+    220 (vsFTPd 3.0.5)
+    Name: anonymous
+    331 Please specify the password.
+    Password:           # pas de mot de passe requis
+    230 Login successful.
+    ftp> ls
+    227 Entering Passive Mode (10,10,41,192,134,10).
+    150 Here comes the directory listing.
+    -rw-r--r-- 1 0 0 1480 Jun 27 08:03 coffee.txt
+    -rw-r--r-- 1 0 0   14 Jun 27 08:04 flag.txt
+    -rw-r--r-- 1 0 0 1595 Jun 27 08:05 tea.txt
+    226 Directory send OK.
+    ftp> type ascii
+    200 Switching to ASCII mode.
+    ftp> get coffee.txt
+
+
+
+- Capture Wireshark (FTP)
+
+La capture montre les commandes USER, PASS, SYST, PASV, LIST, TYPE,
+RETR, QUIT. Le canal de contrôle (TCP 21) porte les commandes, tandis
+que les données (LIST output, contenu du fichier) transitent sur une
+connexion séparée négociée via PASV.
+
+
+SMTP
+----
+
+SMTP définit l'envoi d'email entre client et serveur mail (ou entre deux
+MTA). Port TCP 25 par défaut.
+
+
+- Commandes SMTP
+
+- HELO ou EHLO : initie la session
+- MAIL FROM : adresse expéditeur
+- RCPT TO : adresse destinataire
+- DATA : indique le début du contenu du message
+- . (seul sur une ligne) : fin du message
+- QUIT : ferme la session
+
+
+- Session SMTP via telnet
+
+
+    --- code bash ---
+    telnet 10.114.186.123 25
+
+
+
+    --- code text ---
+    220 example.thm ESMTP Exim 4.95 Ubuntu
+    HELO client.thm
+    250 example.thm Hello client.thm [10.11.81.126]
+    MAIL FROM: <user@client.thm>
+    250 OK
+    RCPT TO: <strategos@server.thm>
+    250 Accepted
+    DATA
+    354 Enter message, ending with "." on a line by itself
+    From: user@client.thm
+    To: strategos@server.thm
+    Subject: Telnet email
+    
+    Hello. I am using telnet to send you an email!
+    .
+    250 OK id=1sMrpq-0001Ah-UT
+    QUIT
+    221 example.thm closing connection
+
+
+
+- Capture Wireshark (SMTP)
+
+La capture montre l'échange complet : HELO, MAIL FROM, RCPT TO, DATA, le
+contenu de l'email, le point final, et QUIT. Le serveur Exim 4.95 répond
+avec des codes 250/354/221. Tout le trafic est en clair — un attaquant
+en capture réseau peut lire l'intégralité du message.
+
+
+POP3
+----
+
+POP3 permet à un client de récupérer ses emails depuis le serveur. C'est
+l'analogue d'une boîte aux lettres : on récupère le courrier,
+éventuellement on le supprime du serveur. Port TCP 110 par défaut.
+
+
+- Commandes POP3
+
+- USER : identifie l'utilisateur
+- PASS : mot de passe
+- STAT : nombre de messages et taille totale
+- LIST : liste tous les messages avec leur taille
+- RETR : récupère le message n
+- DELE : marque le message n pour suppression
+- QUIT : termine la session et applique les suppressions
+
+
+- Le piège TLS (Dovecot)
+
+L'énoncé demande d'utiliser telnet sur le port 110, mais le serveur
+Dovecot de la VM a le paramètre disable_plaintext_auth = yes (activé par
+défaut quand un certificat TLS est présent). Résultat :
+
+
+    --- code text ---
+    $ telnet 10.114.186.123 110
+    +OK Dovecot (Ubuntu) ready.
+    USER linda
+    -ERR [AUTH] Plaintext authentication disallowed on non-secure (SSL/TLS) connections.
+
+
+Telnet ne sait pas négocier TLS. Il faut passer par openssl s_client
+pour établir le canal chiffré, puis utiliser les mêmes commandes POP3.
+
+
+- Solution avec openssl s_client
+
+Option 1 — STARTTLS sur le port 110 :
+
+
+    --- code bash ---
+    openssl s_client -connect 10.114.186.123:110 -starttls pop3 -crlf -quiet
+
+
+Option 2 — POP3S implicite sur le port 995 :
+
+
+    --- code bash ---
+    openssl s_client -connect 10.114.186.123:995 -crlf -quiet
+
+
+Une fois le canal TLS établi, la séquence POP3 est identique :
+
+
+    --- code text ---
+    +OK Dovecot (Ubuntu) ready.
+    USER linda
+    +OK
+    PASS Pa$$123
+    +OK Logged in.
+    STAT
+    +OK 4 2216
+    LIST
+    +OK 4 messages:
+    1 690
+    2 589
+    3 483
+    4 454
+    .
+    RETR 4
+    +OK 454 octets
+    Return-path: <user@client.thm>
+    Envelope-to: linda@server.thm
+    ...
+    Subject: Your Flag
+    
+    Hello!
+    Here's your flag:
+    THM{TELNET_RETR_EMAIL}
+    Enjoy your journey!
+    .
+    QUIT
+    +OK Logging out.
+
+
+| Note pratique : le mot de passe Pa$$123 contient des $. En shell,
+| utiliser des simples quotes ou échapper : 'Pa$$123' ou Pa\$\$123 pour
+| éviter l'expansion de variable.
+
+
+- Capture Wireshark (POP3)
+
+La capture montre les commandes USER, PASS, STAT, LIST, RETR, QUIT. Le
+mot de passe transite en clair sur le réseau — c'est précisément la
+raison pour laquelle Dovecot bloque l'authentification plaintext sur une
+connexion non chiffrée. Avec TLS (ce que la VM actuelle impose), ces
+commandes sont encapsulées dans le tunnel chiffré et invisibles en
+capture.
+
+
+IMAP
+----
+
+IMAP synchronise les messages entre le serveur et plusieurs clients
+(lecture, déplacement, suppression). Contrairement à POP3 qui tend à
+supprimer les messages du serveur après récupération, IMAP garde les
+messages côté serveur et synchronise leur état. Port TCP 143 par défaut.
+
+
+- Commandes IMAP
+
+- LOGIN : authentification
+- SELECT : sélectionne le dossier (ex : inbox)
+- FETCH : récupère le message n (header + body)
+- MOVE : déplace des messages vers un autre dossier
+- COPY : copie des messages
+- LOGOUT : déconnexion
+
+Chaque commande client est préfixée par un tag (A, B, C, D...) pour
+faire correspondre les réponses du serveur.
+
+
+- Session IMAP via telnet
+
+
+    --- code bash ---
+    telnet 10.114.186.123 143
+
+
+
+    --- code text ---
+    * OK [CAPABILITY IMAP4rev1 SASL-IR LOGIN-REFERRALS ID ENABLE IDLE LITERAL+ STARTTLS AUTH=PLAIN] Dovecot (Ubuntu) ready.
+    A LOGIN strategos
+    A OK [CAPABILITY IMAP4rev1 ...] Logged in
+    B SELECT inbox
+    * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)
+    * 4 EXISTS
+    * 0 RECENT
+    * OK [UNSEEN 2] First unseen.
+    * OK [UIDVALIDITY 1719824692] UIDs valid
+    * OK [UIDNEXT 5] Predicted next UID
+    B OK [READ-WRITE] Select completed
+    C FETCH 3 body[]
+    * 3 FETCH (BODY[] {445}
+    Return-path: <user@client.thm>
+    Envelope-to: strategos@server.thm
+    ...
+    Hello. I am using telnet to send you an email!
+    )
+    C OK Fetch completed
+    D LOGOUT
+    * BYE Logging out
+    D OK Logout completed
+
+
+
+- Capture Wireshark (IMAP)
+
+La capture montre 4 commandes client (LOGIN, SELECT, FETCH, LOGOUT)
+préfixées par des tags, et les réponses serveur longues. Comme pour POP3
+et SMTP, le trafic est en clair — la bannière Dovecot annonce d'ailleurs
+la capabilité STARTTLS.
+
+
+Synthèse : ports et sécurité
+----------------------------
+
+| Protocole | Port contrôle | Port sécurisé | Sécurisation |
+|-----------|--------------|---------------|--------------|
+| DNS | UDP/TCP 53 | DoT (853) / DoH (443) | DNS over TLS / DNS over HTTPS |
+| HTTP | TCP 80 | TCP 443 (HTTPS) | TLS |
+| FTP | TCP 21 | TCP 990 (FTPS) | TLS (FTP over SSL) ou SFTP (SSH) |
+| SMTP | TCP 25 | TCP 465 (SMTPS) / 587 (submission) | STARTTLS ou TLS implicite |
+| POP3 | TCP 110 | TCP 995 (POP3S) | STARTTLS ou TLS implicite |
+| IMAP | TCP 143 | TCP 993 (IMAPS) | STARTTLS ou TLS implicite |
+
+Tous ces protocoles textuels envoient les credentials en clair sur le
+réseau. Une capture Wireshark suffit pour les lire. Les versions
+sécurisées encapsulent l'échange dans un tunnel TLS — telnet ne peut pas
+le faire, d'où le recours à openssl s_client (ou ncat --ssl,
+gnutls-cli).
+
+
+Leçons retenues
+---------------
+
+1. Protocoles textuels = lisibilité réseau : HTTP, FTP, SMTP, POP3, IMAP
+   sont tous des protocoles en clair lisibles caractère par caractère.
+   C'est ce qui permet de les manipuler à la main avec telnet, mais
+   c'est aussi ce qui les rend vulnérables à l'écoute passive.
+
+2. disable_plaintext_auth chez Dovecot : ce paramètre bloque
+   l'authentification sur les connexions non chiffrées dès qu'un
+   certificat TLS est configuré. C'est le comportement attendu en
+   production. La room TryHackMe n'a pas été mise à jour pour refléter
+   ce durcissement — l'énoncé demande telnet, le serveur impose TLS.
+
+3. openssl s_client comme telnet sur TLS : pour les protocoles textuels
+   sécurisés, openssl s_client -starttls <proto> ou une connexion
+   directe sur le port sécurisé permet de garder l'interaction manuelle.
+   Options utiles : -crlf (fins de ligne CRLF), -quiet (supprime le dump
+   du handshake), -starttls pop3|smtp|imap.
+
+4. STARTTLS vs TLS implicite : STARTTLS négocie le passage à TLS dans la
+   session existante sur le port en clair (110, 143, 25, 21). TLS
+   implicite établit le handshake dès la connexion sur un port dédié
+   (995, 993, 465, 990). Les deux coexistent selon la configuration du
+   serveur.

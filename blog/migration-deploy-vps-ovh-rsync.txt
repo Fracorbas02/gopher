@@ -1,0 +1,319 @@
+======================================================================
+Bastodoc migre sur mon VPS : rsync, rrsync et les pièges du cloud-init
+======================================================================
+
+Le 2026-09-30 / Tags : ci-cd, github-actions, rsync, devops, Linux
+
+
+En mai dernier, j'ai automatisé le déploiement de ce blog (Bastodoc, un
+Docusaurus) vers mon hébergement o2switch via une CI github. Le système
+fonctionnait bien : le runner s'ajoutait lui-même à la whitelist SSH via
+l'API cPanel, balançait le build en rsync, puis s'auto-retirait. Sauf
+que depuis, j'ai acquis un VPS OVH qui a pour vocation d'héberger mes
+services. La raison est multiple : à la fois financière (le même coût)
+et pratique, avec un VPS OVH j'ai la main sur tout, une IPv4 et v6
+publique et donc la possibilité d'héberger des services à la volée (ce
+que o2switch permet également sauf qu'ils n'avaient plus de VPS
+disponible). Voici comment s'est passée la migration, avec les pièges
+rencontrés au passage et il y en a eu un beau.
+
+
+
+>>> INFO :
+J'utilise l'achronyme VPS, ce dernier signifie : Virtual Private Server.
+Concrètement, c'est une machine virtuelle privée hébergée chez un
+opérateur
+
+
+
+L'architecture cible
+--------------------
+
+Le but est simple : le runner GitHub pousse le build Docusaurus sur le
+VPS en rsync sur un tunnel SSH. Mais on ne va quand même pas donner une
+clé SSH avec un accès complet au serveur à un runner GitHub. Donc on se
+met trois exigences :
+
+1. Un compte dédié au déploiement, sans privilèges
+2. Aucune exécution de commande arbitraire possible avec cette clé
+3. Un périmètre d'écriture verrouillé : la clé docs ne doit pouvoir
+   écrire que dans le dossier dédié, jamais ailleurs
+
+La réponse à 2 et 3, c'est le combo forced command + rrsync.
+
+
+Le compte deploy
+----------------
+
+Un compte de service, deploy, avec un shell classique. Détail qui a son
+importance et qui m'a coûté une fausse piste : avec une forced command
+dans authorized_keys, sshd exécute la commande via le shell de
+l'utilisateur (shell -c "..."). Un shell nologin ferait donc échouer
+chaque déploiement. L'enfermement ne vient pas du shell, il vient de la
+forced command et des options de restriction de la ligne de clé.
+
+Côté permissions, le dossier du serveur web doit appartenir à deploy
+pour que rsync puisse écrire et surtout appliquer son --delete :
+
+
+    --- code bash ---
+    sudo useradd -m -s /bin/bash deploy
+    sudo chown -R deploy:deploy /opt/docker/docs/site
+
+
+Attention à ne pas donner plus large : le VPS a vocation d'héberger
+d'autres services, donc on limite uniquement au dossier voulu. Le compte
+de déploiement n'a strictement rien à faire à côté de son dossier de
+référence.
+
+
+rrsync : la forced command qui verrouille tout
+----------------------------------------------
+
+rrsync est le wrapper restrictif fourni avec rsync (un script Python
+depuis, présent dans /usr/bin/rrsync sur Debian Trixie).
+
+>>> INFO :
+Pour savoir où se trouve cette commande, vous pouvez faire :
+
+    --- code bash ---
+    dpkg -L rsync | grep rrsync
+
+Le paquet est en fait directement installé dans rsync, ça n'est pas un
+paquet à part
+
+Invoqué en forced command, il ne laisse passer que des commandes rsync
+légitimes, restreintes à une racine imposée. Sur Debian 13, il est bien
+dans le paquet rsync lui-même, j'ai perdu du temps à chercher un paquet
+séparé qui n'existe pas.
+
+Le fichier /home/deploy/.ssh/authorized_keys, une ligne par projet :
+
+
+    --- code ---
+    restrict,command="/usr/bin/rrsync -wo /opt/docker/docs/site" ssh-ed25519 AAAA... gha-docs
+    restrict,command="/usr/bin/rrsync -wo /opt/docker/portfolio/site" ssh-ed25519 AAAA... gha-portfolio
+
+
+Décryptage :
+
+- restrict désactive tout : forwarding de port, d'agent, PTY, X11... Il
+  ne reste que la forced command
+- -wo (write-only) : le runner peut pousser, mais ne peut pas lire le
+  contenu du serveur. Une clé compromise ne permet d'écraser que le
+  site, pas d'exfiltrer
+- le chemin verrouille la racine : tout ce que le client envoie atterrit
+  dans ce dossier, impossible d'en sortir via des chemins relatifs
+
+Point de conception important : une paire de clés par projet, pas une
+clé partagée. La restriction étant attachée à la ligne de clé, une clé
+unique donnerait le même périmètre à tous les dépôts, et la rotation
+d'un secret GitHub compromis ne toucherait qu'un seul projet. Le compte
+est mutualisé, jamais la clé.
+
+Et le chemin distant dans la commande rsync côté CI ? Il disparaît :
+deploy@serveur: et c'est tout. C'est rrsync qui décide où ça atterrit,
+impossible donc de se tromper de dossier depuis la CI.
+
+
+La CI, version VPS
+------------------
+
+Le workflow se simplifie radicalement par rapport à la version o2switch
+: plus d'API cPanel, plus de gestion de whitelist (le VPS est le mien,
+la clé + la forced command suffisent). Un seul job :
+
+
+    --- code yaml ---
+    name: Build & Deploy to VPS OVH
+    
+    on:
+      push:
+        branches: [main]
+      workflow_dispatch:
+    
+    jobs:
+      deploy:
+        name: Build & Deploy to VPS
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-node@v4
+            with:
+              node-version: 24
+              cache: 'npm'
+          - run: npm ci
+          - run: npm run build
+          - name: Setup SSH
+            run: |
+              mkdir -p ~/.ssh && chmod 700 ~/.ssh
+              install -m 600 /dev/stdin ~/.ssh/id_ed25519 <<< "${{ secrets.SSH_PRIVATE_KEY }}"
+              echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          - name: Deploy via rsync
+            run: |
+              rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+                -e "ssh -i ~/.ssh/id_ed25519" \
+                build/ \
+                ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:
+
+
+Quatre secrets au total : SSH_HOST, SSH_USER, SSH_PRIVATE_KEY et
+SSH_KNOWN_HOSTS. Ce dernier mérite une explication : plutôt que le
+classique StrictHostKeyChecking=no (qui accepte n'importe quel serveur
+qui répond, donc n'importe quel MITM pendant le run), on fige
+l'empreinte de la clé host du VPS une fois pour toutes avec ssh-keyscan,
+et le runner vérifie la signature à chaque déploiement. Pour cela, vous
+pouvez récupérer la clé publique avec cette commande :
+
+    --- code bash ---
+    ssh-keyscan -t ed25519 [IP du serveur]
+
+
+Le --chmod fige les droits côté serveur (sinon rsync propage les
+permissions du runner, qui tournent en umask 0002, pas idéal pour un
+docroot).
+
+
+Les pièges rencontrés
+---------------------
+
+La partie "ça marche du premier coup" s'est arrêtée assez vite. Voici la
+liste de ce qui m'a fait perdre du temps, dans l'ordre chronologique,
+parce que chacun de ces pièges vaut d'être connu.
+
+
+- Le runner n'a pas de \~/.ssh
+
+Premier run : install: cannot create regular file
+'/home/runner/.ssh/id_ed25519': No such file or directory. Le home du
+runner ne contient pas de .ssh par défaut, et install ne crée pas les
+répertoires parents. D'où le mkdir -p ~/.ssh && chmod 700 ~/.ssh en tête
+du step. tout bête, mais ça bloque tout le monde au premier déploiement.
+
+
+- Un secret vide, silencieusement
+
+Deuxième run : Permission denied (publickey,password). Je vérifie la clé
+privée, la publique, le authorized_keys, quinze fois et tout correspond.
+Sauf qu'en relisant le log du runner avec attention : echo "" >
+~/.ssh/known_hosts. GitHub masque les secrets par des ``... sauf quand
+la valeur est vide*, auquel cas il n'y a rien à masquer. La chaîne vide
+entre les quotes disait tout.
+
+La cause : le secret s'appelait SSH_KNOWN_HOST (singulier) et la CI
+référençait SSH_KNOWN_HOSTS (pluriel). GitHub Actions ne râle jamais sur
+une référence inconnue : secrets.NIMPORTE_QUOI renvoie une chaîne vide,
+sans warning, sans erreur de syntaxe. Mon diagnostic était parti sur la
+piste "clé privée invalide" alors que la clé était parfaite, c'est ça
+qui m'a le plus marqué : on re-vérifie en boucle ce qu'on soupçonne, pas
+ce qu'on a touché en dernier.
+
+Moralité : quand un secret se résout en chaîne vide dans un log, c'est
+presque toujours un problème de nom, pas de valeur.
+
+
+- Le log qui ne loggait rien
+
+Pour diagnostiquer le Permission denied, j'allais voir les logs serveur.
+Sauf que sur Debian, /var/log/auth.log n'existe plus : depuis Bookworm,
+plus de rsyslog par défaut, tout est dans journald :
+
+
+    --- code bash ---
+    journalctl -u ssh --since "1 hour ago" | grep -i deploy
+
+
+Deuxième surprise : que du bruit (des tentatives de brute-force sur
+root, deploy, zabbix... classique sur un serveur public), aucune trace
+du runner. Pas parce qu'il ne se connectait pas, mais parce qu'à
+LogLevel INFO, sshd ne loggue pas les échecs publickey mais uniquement
+les échecs password et les utilisateurs invalides. Pour voir les refus
+de clé :
+
+
+    --- code bash ---
+    # temporairement, dans sshd_config ou un drop-in
+    LogLevel VERBOSE
+
+
+Et là, magie : Accepted publickey for deploy ... found at
+/home/deploy/.ssh/authorized_keys:1. Le runner authentifiait déjà
+correctement à ce moment-là. En réalité, je m'étais simplement trompé
+d'utilisateur dans la variable d'environnement...
+
+
+- Et le plus beau : le cloud-init d'OVH
+
+En filtrant les logs, je tombe sur des lignes troublantes : Failed
+password for root, Failed password for deploy. Le serveur accepte des
+tentatives de mot de passe, alors que mon sshd_config dit explicitement
+PasswordAuthentication no et PermitRootLogin no.
+
+Un sshd -T (qui affiche la config effective, fusion de tout) tranche :
+
+
+    --- code bash ---
+    sshd -T | grep -i passwordauthentication
+    # passwordauthentication yes
+
+
+La faute au Include /etc/ssh/sshd_config.d/*.conf en tête de fichier, et
+à un gentil fichier livré par le provider :
+
+
+    --- code ---
+    # /etc/ssh/sshd_config.d/50-cloud-init.conf
+    PasswordAuthentication yes
+
+
+Autrement dit : depuis l'installation du VPS, ma conf "durcie" était
+partiellement neutralisée par un fichier d'override cloud-init que je
+n'avais jamais ouvert. Les fichiers inclus priment sur le fichier
+principal, c'est documenté, mais ça ne saute pas aux yeux quand on relit
+son sshd_config en se disant "pourtant j'ai bien mis no". C'est donc une
+erreur de rigueur de ma part, une chose de plus à  penser.
+
+La leçon : après toute modification de sshd_config, sshd -T est la seule
+vérité. Le fichier de config n'est qu'une intention, la sortie de -T est
+la réalité. Et sur un serveur cloud, vérifier sshd_config.d/ le jour de
+l'installation, pas le jour où les logs vous y forcent.
+
+
+Et maintenant ?
+---------------
+
+Le déploiement docs est fonctionnel de bout en bout : build Docusaurus
+sur le runner, rsync verrouillé par rrsync, contenu servi par le Nginx
+Proxy Manager du VPS. Le portfolio suivra le même schéma et la ligne
+authorized_keys existe déjà, il ne reste qu'à créer le repo et la CI.
+
+Pour tester l'enfermement depuis mon poste, deux commandes qui doivent
+échouer :
+
+
+    --- code bash ---
+    # la lecture est interdite par -wo
+    rsync -az deploy@mon-serveur: /tmp/test-pull/
+    # toute commande hors rsync est refusée par rrsync
+    ssh -i ~/.ssh/gha-docs deploy@mon-serveur "uptime"
+
+
+Si les deux échouent proprement, l'enceinte est étanche. C'est le genre
+de vérification qu'on ne délègue pas : la CI prouve que le déploiement
+passe, seul un test négatif prouve que le reste ne passe pas. Et bingo,
+ça ne loupe pas :
+
+    --- code bash ---
+    rsync -az -e "ssh -i /tmp/ThePrivateKey" deploy@[IP]: /tmp/test-pull
+    /usr/bin/rrsync error: reading from write-only server is not allowed
+    rsync: connection unexpectedly closed (0 bytes received so far) [Receiver]
+    rsync error: error in rsync protocol data stream (code 12) at io.c(303) [Receiver=3.5.1-g04355d27]
+
+Merci unix.stackexchange
+(https://unix.stackexchange.com/questions/127352/specify-identity-file-id-rsa-with-rsync)
+pour spécifier la clé à utiliser...
+
+
+    --- code bash ---
+    ssh -i /tmp/ThePrivateKey deploy@[IP] "uptime"
+    /usr/bin/rrsync error: SSH_ORIGINAL_COMMAND does not run rsync
